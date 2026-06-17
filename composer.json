@@ -1,6 +1,6 @@
 {
     "name": "roundly-consulting/posts-for-laravel",
-    "description": "A modern, multilingual, SEO-ready blog/posts engine for Laravel with translatable content, a publishing lifecycle, categories, tags, and media.",
+    "description": "A modern, multilingual, SEO-ready blog/posts engine for Laravel with translatable content, a publishing lifecycle, categories, and tags.",
     "keywords": [
         "roundly-consulting",
         "laravel",
@@ -8,8 +8,7 @@
         "blog",
         "cms",
         "translatable",
-        "seo",
-        "media"
+        "seo"
     ],
     "homepage": "https://github.com/roundly-consulting/posts-for-laravel",
     "license": "MIT",
@@ -22,10 +21,7 @@
     ],
     "require": {
         "php": "^8.4",
-        "illuminate/contracts": "^12.0|^13.0",
-        "acme/laravel-medialibrary": "^11.0",
-        "acme/laravel-package-tools": "^1.16",
-        "acme/laravel-translatable": "^6.0"
+        "illuminate/contracts": "^12.0|^13.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
