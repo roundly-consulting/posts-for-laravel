@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
+use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\PostFactory;
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
 use RoundlyConsulting\Posts\Enums\PostStatus;
@@ -26,11 +27,6 @@ use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Events\PostScheduled;
 use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
 use RoundlyConsulting\Posts\Support\JsonLdBuilder;
-use Acme\Image\Enums\Fit;
-use Acme\MediaLibrary\HasMedia;
-use Acme\MediaLibrary\InteractsWithMedia;
-use Acme\MediaLibrary\MediaCollections\Models\Media;
-use Acme\Translatable\HasTranslations;
 
 /**
  * @property string $id
@@ -52,15 +48,14 @@ use Acme\Translatable\HasTranslations;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  */
-final class Post extends Model implements HasMedia
+final class Post extends Model
 {
     /** @use HasFactory<PostFactory> */
     use HasFactory;
 
     use HasSluggableTranslations;
-    use HasTranslations;
+    use HasTranslatableAttributes;
     use HasUuids;
-    use InteractsWithMedia;
     use SoftDeletes;
 
     protected $guarded = [];
@@ -87,6 +82,12 @@ final class Post extends Model implements HasMedia
             'status' => PostStatus::class,
             'published_at' => 'immutable_datetime',
             'seo' => 'array',
+            'title' => 'array',
+            'slug' => 'array',
+            'perex' => 'array',
+            'content' => 'array',
+            'meta_title' => 'array',
+            'meta_description' => 'array',
         ];
     }
 
@@ -263,7 +264,7 @@ final class Post extends Model implements HasMedia
             canonical: $base->canonical,
             ogTitle: $base->ogTitle ?? $base->metaTitle,
             ogDescription: $base->ogDescription ?? $base->metaDescription,
-            ogImage: $base->ogImage ?? ($this->getFirstMediaUrl('default') ?: null),
+            ogImage: $base->ogImage,
             ogType: $base->ogType ?? 'article',
             twitterCard: $base->twitterCard ?? (string) config('posts.seo.default-card', 'summary_large_image'),
             twitterSite: $base->twitterSite ?? self::stringConfig('posts.seo.twitter-site'),
@@ -325,24 +326,6 @@ final class Post extends Model implements HasMedia
                     ->orWhere("slug->{$fallback}", $value);
             })
             ->first();
-    }
-
-    public function registerMediaCollections(): void
-    {
-        $this->addMediaCollection('default')
-            ->useDisk((string) config('posts.disk'))
-            ->withResponsiveImagesIf((bool) config('posts.responsive-images'));
-    }
-
-    public function registerMediaConversions(?Media $media = null): void
-    {
-        $conversion = $this->addMediaConversion('preview');
-
-        $conversion = config('posts.queue-file-conversions')
-            ? $conversion->queued()
-            : $conversion->nonQueued();
-
-        $conversion->fit(Fit::Crop, 250, 250)->sharpen(10);
     }
 
     protected static function newFactory(): PostFactory

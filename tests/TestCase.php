@@ -8,8 +8,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RoundlyConsulting\Posts\PostsServiceProvider;
-use Acme\MediaLibrary\MediaLibraryServiceProvider;
-use Acme\Translatable\TranslatableServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -18,8 +16,6 @@ abstract class TestCase extends Orchestra
     {
         return [
             PostsServiceProvider::class,
-            MediaLibraryServiceProvider::class,
-            TranslatableServiceProvider::class,
         ];
     }
 
@@ -38,9 +34,6 @@ abstract class TestCase extends Orchestra
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-
-        $mediaMigration = include __DIR__.'/../vendor/acme/laravel-medialibrary/database/migrations/create_media_table.php.stub';
-        $mediaMigration->up();
 
         Schema::create('users', function (Blueprint $table): void {
             $table->increments('id');

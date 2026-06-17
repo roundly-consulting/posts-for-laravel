@@ -95,8 +95,8 @@ return [
     |--------------------------------------------------------------------------
     |
     | Defaults applied when a post does not provide its own SEO values. The
-    | rendered meta tags fall back to the post's title, perex and featured
-    | image when these and the post-level overrides are absent.
+    | rendered meta tags fall back to the post's title and perex when these and
+    | the post-level overrides are absent.
     |
     */
 
@@ -126,39 +126,5 @@ return [
             'logo' => env('POSTS_PUBLISHER_LOGO'),
         ],
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Media Disk
-    |--------------------------------------------------------------------------
-    |
-    | The filesystem disk used to store media attachments for posts.
-    |
-    */
-
-    'disk' => env('POSTS_DISK', env('MEDIA_DISK', 'public')),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Responsive Images
-    |--------------------------------------------------------------------------
-    |
-    | Whether responsive image variants are generated for image attachments.
-    |
-    */
-
-    'responsive-images' => env('POSTS_GENERATE_RESPONSIVE_IMAGES', true),
-
-    /*
-    |--------------------------------------------------------------------------
-    | Queue File Conversions
-    |--------------------------------------------------------------------------
-    |
-    | When true, the "preview" conversion is generated on the queue. When false
-    | it is generated synchronously during the request lifecycle.
-    |
-    */
-
-    'queue-file-conversions' => env('POSTS_QUEUE_FILE_CONVERSIONS', env('QUEUE_CONVERSIONS_BY_DEFAULT', true)),
 
 ];
