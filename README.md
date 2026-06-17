@@ -3,12 +3,11 @@
 A modern, multilingual, SEO-ready blog/posts engine for Laravel. Posts for Laravel gives you
 translatable content, a real publishing lifecycle (draft / scheduled / published / archived),
 a flexible taxonomy (nested categories + tags), per-post SEO meta and schema.org structured
-data, a polymorphic author that works with both bigint- and UUID-keyed models, and responsive
-media — all config-first.
+data, and a polymorphic author that works with both bigint- and UUID-keyed models — all
+config-first.
 
-Built on [acme/laravel-package-tools](https://github.com/acme/laravel-package-tools),
-[acme/laravel-translatable](https://github.com/acme/laravel-translatable), and
-[acme/laravel-medialibrary](https://github.com/acme/laravel-medialibrary).
+Built entirely on native Laravel: translatable attributes are stored as JSON columns and
+resolved through a small package concern, with no third-party runtime dependencies.
 
 ## Requirements
 
@@ -76,9 +75,6 @@ The published `config/posts.php`:
 | `json-ld.author-attribute` | string | `name` | — | Author model attribute used for the author name. |
 | `json-ld.publisher.name` | ?string | `null` | `POSTS_PUBLISHER_NAME` | Publisher organisation name. |
 | `json-ld.publisher.logo` | ?string | `null` | `POSTS_PUBLISHER_LOGO` | Publisher logo URL. |
-| `disk` | string | `public` | `POSTS_DISK` | Media disk. |
-| `responsive-images` | bool | `true` | `POSTS_GENERATE_RESPONSIVE_IMAGES` | Generate responsive image variants. |
-| `queue-file-conversions` | bool | `true` | `POSTS_QUEUE_FILE_CONVERSIONS` | Queue the `preview` conversion. |
 
 ## Usage
 
@@ -95,8 +91,10 @@ final class User extends Authenticatable
 }
 ```
 
-Create a post with translated content. Slugs are generated per locale from the title,
-de-duplicated automatically, and a manually set slug is preserved:
+Create a post with translated content. Each translatable attribute (`title`, `slug`, `perex`,
+`content`, `meta_title`, `meta_description`) is stored as a JSON map of locale => value.
+Slugs are generated per locale from the title, de-duplicated automatically, and a manually set
+slug is preserved:
 
 ```php
 use RoundlyConsulting\Posts\Models\Post;
@@ -109,7 +107,17 @@ $post->save();
 
 $post->author()->associate($user);   // polymorphic author
 $post->save();
+
+// Read a translation
+$post->getTranslation('title', 'sk');     // 'Ahoj svet'
+$post->getTranslations('title');          // ['en' => 'Hello world', 'sk' => 'Ahoj svet']
+$post->translate('title');                // current-locale value, with fallback
+$post->title;                             // same — current-locale value, with fallback
 ```
+
+Translations resolve to the requested locale, then the fallback locale
+(`translatable.fallback_locale`, else `posts.locales.fallback`, else `app.fallback_locale`),
+then the first available translation.
 
 ### Publishing lifecycle
 
@@ -173,7 +181,7 @@ the name.
 
 `meta_title` / `meta_description` are translatable; the remaining SEO fields live in a
 non-translatable `seo` bag. Sensible fallbacks are applied (meta title → title, meta
-description → perex, og:image → featured image):
+description → perex):
 
 ```php
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
@@ -228,15 +236,9 @@ app(CreatePostAction::class)->execute(new CreatePostData(
 `PostPublished`, `PostScheduled`, `PostArchived`, `PostDrafted` (each carrying the `postId`)
 are dispatched on the matching transition — listen for them to extend behaviour.
 
-### Media
-
-Posts attach images/video via Acme's media library, with a `preview` conversion and optional
-responsive images:
-
-```php
-$post->addMedia($request->file('cover'))->toMediaCollection();
-$post->getFirstMediaUrl();
-```
+> **Media:** post image/video attachments are intentionally **not** part of this package. A
+> dedicated in-house media package for Laravel will cover that separately. Until then, set
+> `og:image` (and any post imagery) explicitly via `SeoData` / your own storage.
 
 ## Migrating from the previous version (pre-release)
 
