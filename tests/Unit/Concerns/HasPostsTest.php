@@ -5,11 +5,12 @@ declare(strict_types=1);
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Tests\Support\AuthorTestModel;
 
-it('exposes the posts an author has written', function (): void {
+it('exposes the posts an author has written via a morph relation', function (): void {
     $author = AuthorTestModel::create(['name' => 'John']);
 
-    Post::create(['author_id' => $author->getKey(), 'content' => 'This lake looks awesome.']);
-    Post::create(['author_id' => $author->getKey(), 'content' => 'Today was a good day.']);
+    Post::factory()->forAuthor($author)->create();
+    Post::factory()->forAuthor($author)->create();
+    Post::factory()->create();
 
     expect($author->posts)
         ->toBeCollection()

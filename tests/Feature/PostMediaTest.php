@@ -5,17 +5,11 @@ declare(strict_types=1);
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use RoundlyConsulting\Posts\Models\Post;
-use RoundlyConsulting\Posts\Tests\Support\AuthorTestModel;
 
 it('attaches an image to a post in the default collection', function (): void {
     Storage::fake('public');
 
-    $author = AuthorTestModel::create(['name' => 'John']);
-
-    $post = Post::create([
-        'author_id' => $author->getKey(),
-        'content' => 'This lake looks awesome.',
-    ]);
+    $post = Post::factory()->create();
 
     $post->addMedia(UploadedFile::fake()->image('lake.jpg'))
         ->toMediaCollection();
@@ -54,4 +48,13 @@ it('registers a queued preview conversion when conversions are queued', function
 
     expect($preview)->not->toBeNull()
         ->and($preview->shouldBeQueued())->toBeTrue();
+});
+
+it('uses the featured image as the og:image fallback', function (): void {
+    Storage::fake('public');
+
+    $post = Post::factory()->create();
+    $post->addMedia(UploadedFile::fake()->image('cover.jpg'))->toMediaCollection();
+
+    expect($post->seo()->ogImage)->not->toBeNull();
 });

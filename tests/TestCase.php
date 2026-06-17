@@ -8,8 +8,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use Orchestra\Testbench\TestCase as Orchestra;
 use RoundlyConsulting\Posts\PostsServiceProvider;
-use RoundlyConsulting\Posts\Tests\Support\AuthorTestModel;
 use Acme\MediaLibrary\MediaLibraryServiceProvider;
+use Acme\Translatable\TranslatableServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
@@ -19,13 +19,20 @@ abstract class TestCase extends Orchestra
         return [
             PostsServiceProvider::class,
             MediaLibraryServiceProvider::class,
+            TranslatableServiceProvider::class,
         ];
     }
 
     protected function defineEnvironment($app): void
     {
         config()->set('database.default', 'testing');
-        config()->set('posts.author-model', AuthorTestModel::class);
+        config()->set('posts.author.key-type', $this->authorKeyType());
+        config()->set('posts.locales.available', ['en', 'sk']);
+    }
+
+    protected function authorKeyType(): string
+    {
+        return 'bigint';
     }
 
     protected function defineDatabaseMigrations(): void
@@ -39,10 +46,10 @@ abstract class TestCase extends Orchestra
             $table->increments('id');
             $table->string('name');
         });
-    }
 
-    protected function getEnvironmentSetUp($app): void
-    {
-        $this->defineEnvironment($app);
+        Schema::create('uuid_users', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('name');
+        });
     }
 }
