@@ -1,9 +1,14 @@
 # Posts for Laravel
 
-Store text, image, and video posts with media attachments and attach them to any author
-model (typically your application's `User`). Media handling is powered by
-[acme/laravel-medialibrary](https://github.com/acme/laravel-medialibrary), including an
-automatic `preview` thumbnail conversion and optional responsive images.
+A modern, multilingual, SEO-ready blog/posts engine for Laravel. Posts for Laravel gives you
+translatable content, a real publishing lifecycle (draft / scheduled / published / archived),
+a flexible taxonomy (nested categories + tags), per-post SEO meta and schema.org structured
+data, a polymorphic author that works with both bigint- and UUID-keyed models, and responsive
+media — all config-first.
+
+Built on [acme/laravel-package-tools](https://github.com/acme/laravel-package-tools),
+[acme/laravel-translatable](https://github.com/acme/laravel-translatable), and
+[acme/laravel-medialibrary](https://github.com/acme/laravel-medialibrary).
 
 ## Requirements
 
@@ -18,130 +23,227 @@ Install the package via Composer:
 composer require roundly-consulting/posts-for-laravel
 ```
 
-Publish and run the migrations:
+Publish and run the migrations (set your author key type first — see Configuration):
 
 ```bash
 php artisan vendor:publish --tag="posts-migrations"
 php artisan migrate
 ```
 
-Optionally publish the config file:
+Optionally publish the config, views, and translations:
 
 ```bash
 php artisan vendor:publish --tag="posts-config"
+php artisan vendor:publish --tag="posts-views"
+php artisan vendor:publish --tag="posts-translations"
 ```
 
-Because the package stores media, make sure the
-[Media Library prerequisites](https://example.com/docs/laravel-medialibrary/installation-setup)
-are met (its `media` table migration is published with `php artisan vendor:publish --provider="Acme\MediaLibrary\MediaLibraryServiceProvider" --tag="medialibrary-migrations"`).
+> **Author key type is fixed at first migrate.** The `author_id` column type is generated from
+> `posts.author.key-type` when the migration runs. Choose `bigint` (default) or `uuid` to match
+> your author model's primary key **before** running `migrate`. Changing it later requires a new
+> additive migration.
+
+> **PostgreSQL:** translatable columns ship as `json`. If you want indexed JSON queries, change
+> them to `jsonb` in the published migration before migrating.
 
 ## Configuration
 
-The published `config/posts.php` looks like this:
+The published `config/posts.php`:
 
-```php
-<?php
-
-declare(strict_types=1);
-
-use RoundlyConsulting\Posts\Models\Post;
-
-return [
-    'model' => Post::class,
-    'author-model' => env('POSTS_AUTHOR_MODEL'),
-    'disk' => env('POSTS_DISK', env('MEDIA_DISK', 'public')),
-    'responsive-images' => env('POSTS_GENERATE_RESPONSIVE_IMAGES', true),
-    'queue-file-conversions' => env('POSTS_QUEUE_FILE_CONVERSIONS', env('QUEUE_CONVERSIONS_BY_DEFAULT', true)),
-];
-```
-
-| Key | Type | Default | Purpose |
-|---|---|---|---|
-| `model` | `class-string<Post>` | `RoundlyConsulting\Posts\Models\Post` | The Post Eloquent model. Point this at a subclass to extend behaviour. |
-| `author-model` | `class-string` \| `null` | `POSTS_AUTHOR_MODEL` env, else `null` | **Required.** The model that authors posts — usually your `User` model. |
-| `disk` | `string` | `POSTS_DISK`, else `MEDIA_DISK`, else `public` | Filesystem disk used to store media attachments. |
-| `responsive-images` | `bool` | `POSTS_GENERATE_RESPONSIVE_IMAGES`, else `true` | Whether responsive image variants are generated. |
-| `queue-file-conversions` | `bool` | `POSTS_QUEUE_FILE_CONVERSIONS`, else `QUEUE_CONVERSIONS_BY_DEFAULT`, else `true` | Generate the `preview` conversion on the queue (`true`) or synchronously (`false`). |
-
-### Environment variables
-
-| Variable | Backs |
-|---|---|
-| `POSTS_AUTHOR_MODEL` | `posts.author-model` |
-| `POSTS_DISK` / `MEDIA_DISK` | `posts.disk` |
-| `POSTS_GENERATE_RESPONSIVE_IMAGES` | `posts.responsive-images` |
-| `POSTS_QUEUE_FILE_CONVERSIONS` / `QUEUE_CONVERSIONS_BY_DEFAULT` | `posts.queue-file-conversions` |
-
-Set the author model in your `.env` (or override the config key directly):
-
-```dotenv
-POSTS_AUTHOR_MODEL=App\Models\User
-```
+| Key | Type | Default | Env | Purpose |
+|---|---|---|---|---|
+| `model` | class-string | `Post::class` | — | The Post model (point at your subclass to extend). |
+| `tables.posts` | string | `posts` | — | Posts table name. |
+| `tables.categories` | string | `post_categories` | — | Categories table name. |
+| `tables.category_post` | string | `category_post` | — | Category/post pivot table. |
+| `tables.tags` | string | `post_tags` | — | Tags table name. |
+| `tables.tag_post` | string | `post_tag` | — | Tag/post pivot table. |
+| `author.key-type` | `bigint`\|`uuid` | `bigint` | `POSTS_AUTHOR_KEY_TYPE` | Author morph key column type. |
+| `author.morph-name` | string | `author` | — | Morph relation name (`author_type`/`author_id`). |
+| `author.nullable` | bool | `true` | — | Whether a post may have no author. |
+| `locales.default` | string | `app.locale` | `POSTS_DEFAULT_LOCALE` | Default content locale. |
+| `locales.fallback` | string | `app.fallback_locale` | `POSTS_FALLBACK_LOCALE` | Fallback locale for translations/route binding. |
+| `locales.available` | list<string> | `['en']` | — | Locales iterated when generating slugs. |
+| `slugs.source` | string | `title` | — | Attribute slugs are generated from. |
+| `slugs.separator` | string | `-` | — | Slug word separator. |
+| `slugs.unique` | bool | `true` | — | Suffix colliding slugs (`-2`, `-3`, …). |
+| `slugs.route-binding` | bool | `true` | — | Bind `{post:slug}` by the translated slug. |
+| `seo.site-name` | ?string | `null` | `POSTS_SITE_NAME` | Site name for SEO output. |
+| `seo.twitter-site` | ?string | `null` | `POSTS_TWITTER_SITE` | Default `twitter:site` handle. |
+| `seo.default-card` | string | `summary_large_image` | — | Default Twitter card type. |
+| `seo.default-robots` | string | `index,follow` | — | Default robots directive. |
+| `json-ld.type` | string | `BlogPosting` | — | schema.org `@type` (`BlogPosting` or `Article`). |
+| `json-ld.author-attribute` | string | `name` | — | Author model attribute used for the author name. |
+| `json-ld.publisher.name` | ?string | `null` | `POSTS_PUBLISHER_NAME` | Publisher organisation name. |
+| `json-ld.publisher.logo` | ?string | `null` | `POSTS_PUBLISHER_LOGO` | Publisher logo URL. |
+| `disk` | string | `public` | `POSTS_DISK` | Media disk. |
+| `responsive-images` | bool | `true` | `POSTS_GENERATE_RESPONSIVE_IMAGES` | Generate responsive image variants. |
+| `queue-file-conversions` | bool | `true` | `POSTS_QUEUE_FILE_CONVERSIONS` | Queue the `preview` conversion. |
 
 ## Usage
 
-### Make a model author posts
+### Authoring multilingual posts
 
-Add the `HasPosts` trait to the model named in `posts.author-model`:
+Add the `HasPosts` trait to any author model (bigint or UUID keyed):
 
 ```php
-use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Posts\Concerns\HasPosts;
 
-class User extends Model
+final class User extends Authenticatable
 {
-    use HasPosts;
+    use HasPosts; // $user->posts (morphMany)
 }
 ```
 
-The trait exposes a `posts()` relationship:
-
-```php
-$user->posts;          // Collection<int, Post>
-$user->posts()->count();
-```
-
-### Create a post and attach media
-
-```php
-$post = $user->posts()->create([
-    'content' => 'This lake looks awesome.',
-]);
-
-// Attach an upload from the current request...
-$post->addMediaFromRequest('attachment')->toMediaCollection();
-
-// ...or any UploadedFile / path.
-$post->addMedia($uploadedFile)->toMediaCollection();
-```
-
-### Read media URLs
-
-Every attachment lands in the `default` collection and gets a `preview` conversion you can
-use as a thumbnail:
-
-```php
-echo $post->getFirstMediaUrl();                         // original attachment
-echo $post->getFirstMediaUrl(conversionName: 'preview'); // 250x250 cropped thumbnail
-```
-
-### The Post model
-
-`RoundlyConsulting\Posts\Models\Post` is a UUID-keyed Eloquent model with:
-
-- `content` — optional long text body.
-- `visible` — boolean flag (defaults to `true`).
-- `author()` — `belongsTo` the configured `author-model` via `author_id`.
-- A media library `default` collection with a `preview` (250x250 crop, sharpened) conversion.
-
-It ships a factory for tests and seeders:
+Create a post with translated content. Slugs are generated per locale from the title,
+de-duplicated automatically, and a manually set slug is preserved:
 
 ```php
 use RoundlyConsulting\Posts\Models\Post;
 
-Post::factory()->create();
-Post::factory()->hidden()->create(); // visible = false
+$post = new Post;
+$post->setTranslation('title', 'en', 'Hello world');
+$post->setTranslation('title', 'sk', 'Ahoj svet');
+$post->setTranslation('content', 'en', '<p>…</p>');
+$post->save();
+
+$post->author()->associate($user);   // polymorphic author
+$post->save();
 ```
+
+### Publishing lifecycle
+
+Posts move through a `PostStatus` enum (`Draft`, `Scheduled`, `Published`, `Archived`) with a
+`published_at` timestamp. Transition methods fire events:
+
+```php
+$post->publish();                     // PostPublished
+$post->schedule(now()->addDay());     // PostScheduled
+$post->archive();                     // PostArchived
+$post->draft();                       // PostDrafted
+```
+
+Query scopes:
+
+```php
+Post::query()->published()->get();    // status = published AND published_at <= now
+Post::query()->draft()->get();
+Post::query()->scheduled()->get();    // scheduled, or published with a future date
+Post::query()->archived()->get();
+```
+
+Run the bundled command (or schedule it) to publish posts whose scheduled time has arrived:
+
+```bash
+php artisan posts:publish-scheduled
+```
+
+```php
+// app/Console/Kernel.php
+$schedule->command('posts:publish-scheduled')->everyMinute();
+```
+
+### Categories and tags
+
+```php
+use RoundlyConsulting\Posts\Models\Category;
+
+$guides = Category::create(['name' => ['en' => 'Guides']]);
+$laravel = Category::create(['name' => ['en' => 'Laravel'], 'parent_id' => $guides->id]);
+
+$post->categories()->sync([$guides->id, $laravel->id]);
+
+// Tags: pass strings (find-or-created by translated name) or Tag models
+$post->syncTags(['eloquent', 'php']);
+
+// Filter
+Post::query()->inCategory($laravel)->get();
+Post::query()->inCategory('laravel')->get();   // by translated slug
+Post::query()->withTag('php')->get();
+
+// Category hierarchy helpers
+$laravel->ancestors();    // [Guides]
+$guides->descendants();   // [Laravel, …]
+```
+
+Category and tag `name` and `slug` are both translatable, and slugs are auto-generated from
+the name.
+
+### SEO meta and structured data
+
+`meta_title` / `meta_description` are translatable; the remaining SEO fields live in a
+non-translatable `seo` bag. Sensible fallbacks are applied (meta title → title, meta
+description → perex, og:image → featured image):
+
+```php
+use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
+
+$post->setSeo(new SeoData(
+    metaTitle: 'Custom title',
+    canonical: 'https://example.test/posts/hello-world',
+    ogImage: 'https://example.test/cover.png',
+    robots: 'index,follow',
+));
+$post->save();
+
+// In a Blade layout:
+{!! $post->renderMetaTags() !!}   // <title>, description, canonical, og:*, twitter:*, robots
+{!! $post->renderJsonLd() !!}     // <script type="application/ld+json"> BlogPosting/Article
+
+$post->seo();        // SeoData with merged config defaults + fallbacks
+$post->toJsonLd();   // array<string, mixed>
+```
+
+### Route-model binding by translated slug
+
+With `posts.slugs.route-binding` enabled, `{post:slug}` resolves by the current locale's slug,
+falling back to the configured fallback locale:
+
+```php
+Route::get('/posts/{post:slug}', fn (Post $post) => view('posts.show', compact('post')));
+```
+
+### Actions (DTO entry points)
+
+```php
+use RoundlyConsulting\Posts\Actions\CreatePostAction;
+use RoundlyConsulting\Posts\DataTransferObjects\CreatePostData;
+use RoundlyConsulting\Posts\DataTransferObjects\CreatePostTranslationData;
+use RoundlyConsulting\Posts\Enums\PostStatus;
+
+app(CreatePostAction::class)->execute(new CreatePostData(
+    translations: [
+        new CreatePostTranslationData(locale: 'en', title: 'Hello', content: '<p>…</p>'),
+    ],
+    status: PostStatus::Published,
+    authorType: $user->getMorphClass(),
+    authorId: $user->getKey(),
+));
+```
+
+`PublishPostAction` and `UpdatePostSeoAction` are also available.
+
+### Events
+
+`PostPublished`, `PostScheduled`, `PostArchived`, `PostDrafted` (each carrying the `postId`)
+are dispatched on the matching transition — listen for them to extend behaviour.
+
+### Media
+
+Posts attach images/video via Acme's media library, with a `preview` conversion and optional
+responsive images:
+
+```php
+$post->addMedia($request->file('cover'))->toMediaCollection();
+$post->getFirstMediaUrl();
+```
+
+## Migrating from the previous version (pre-release)
+
+This unreleased version replaces the old `visible` boolean and single `content` column. For any
+early adopter: `visible = true → status = published, published_at = now`;
+`visible = false → status = draft`; move the old `content` into the `content` JSON translation
+for your default locale. The `author-model` config is gone — authorship is now polymorphic.
 
 ## Testing
 
@@ -151,8 +253,12 @@ composer test
 
 ## Changelog
 
-Please see [CHANGELOG](CHANGELOG.md) for what has changed recently.
+See [CHANGELOG.md](CHANGELOG.md).
+
+## Contributing
+
+Please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-The MIT License (MIT). Please see [LICENSE.md](LICENSE.md) for more information.
+The MIT License (MIT). See [LICENSE.md](LICENSE.md).
