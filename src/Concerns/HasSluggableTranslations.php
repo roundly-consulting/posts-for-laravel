@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Posts\Concerns;
 
 use Illuminate\Support\Str;
-use Acme\Translatable\HasTranslations;
 
 /**
  * Auto-generates per-locale slugs from the configured source attribute on save.
  *
- * Requires the model to also use Acme's HasTranslations and to list both the
+ * Requires the model to also use HasTranslatableAttributes and to list both the
  * source attribute and "slug" as translatable.
  *
  * @mixin \Illuminate\Database\Eloquent\Model
- * @mixin HasTranslations
+ * @mixin HasTranslatableAttributes
  */
 trait HasSluggableTranslations
 {
@@ -45,7 +44,7 @@ trait HasSluggableTranslations
 
             $existingSlug = $this->getTranslation('slug', $locale, false);
 
-            if (is_string($existingSlug) && $existingSlug !== '') {
+            if ($existingSlug !== '') {
                 continue;
             }
 

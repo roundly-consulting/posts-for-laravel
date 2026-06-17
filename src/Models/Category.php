@@ -14,8 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
+use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\CategoryFactory;
-use Acme\Translatable\HasTranslations;
 
 /**
  * @property string $id
@@ -36,7 +36,7 @@ final class Category extends Model
     use HasFactory;
 
     use HasSluggableTranslations;
-    use HasTranslations;
+    use HasTranslatableAttributes;
     use HasUuids;
     use SoftDeletes;
 
@@ -55,6 +55,8 @@ final class Category extends Model
     {
         return [
             'position' => 'integer',
+            'name' => 'array',
+            'slug' => 'array',
         ];
     }
 

@@ -1,0 +1,70 @@
+<?php
+
+declare(strict_types=1);
+
+use RoundlyConsulting\Posts\Models\Post;
+
+it('reads a translatable attribute directly in the current locale', function (): void {
+    app()->setLocale('sk');
+
+    $post = Post::factory()->withTitles(['en' => 'Hello', 'sk' => 'Ahoj'])->create();
+
+    expect($post->title)->toBe('Ahoj');
+
+    app()->setLocale('en');
+
+    expect($post->fresh()->title)->toBe('Hello');
+});
+
+it('falls back to the first available translation when neither locale nor fallback match', function (): void {
+    config()->set('translatable.fallback_locale', null);
+    config()->set('posts.locales.fallback', null);
+    config()->set('app.fallback_locale', null);
+
+    $post = new Post;
+    $post->setTranslation('title', 'de', 'Hallo');
+
+    expect($post->getTranslation('title', 'fr'))->toBe('Hallo');
+});
+
+it('returns an empty string when an attribute has no translations at all', function (): void {
+    $post = new Post;
+
+    expect($post->getTranslation('title', 'en'))->toBe('')
+        ->and($post->getTranslations('title'))->toBe([]);
+});
+
+it('resolves the fallback locale from the posts config when translatable config is absent', function (): void {
+    config()->set('translatable.fallback_locale', null);
+    config()->set('posts.locales.fallback', 'en');
+
+    $post = new Post;
+    $post->setTranslation('content', 'en', '<p>Body</p>');
+
+    expect($post->getTranslation('content', 'sk'))->toBe('<p>Body</p>');
+});
+
+it('translates an attribute via the translate helper for an explicit and the current locale', function (): void {
+    app()->setLocale('en');
+
+    $post = new Post;
+    $post->setTranslation('title', 'en', 'Hello');
+    $post->setTranslation('title', 'sk', 'Ahoj');
+
+    expect($post->translate('title'))->toBe('Hello')
+        ->and($post->translate('title', 'sk'))->toBe('Ahoj');
+});
+
+it('does not return a fallback translation when fallback is disabled', function (): void {
+    $post = new Post;
+    $post->setTranslation('title', 'en', 'Hello');
+
+    expect($post->getTranslation('title', 'sk', false))->toBe('');
+});
+
+it('ignores non-string values stored in the raw translation map', function (): void {
+    $post = new Post;
+    $post->setRawAttributes(['title' => json_encode(['en' => 'Hello', 'sk' => 123])]);
+
+    expect($post->getTranslations('title'))->toBe(['en' => 'Hello']);
+});

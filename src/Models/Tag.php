@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
+use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\TagFactory;
-use Acme\Translatable\HasTranslations;
 
 /**
  * @property string $id
@@ -30,7 +30,7 @@ final class Tag extends Model
     use HasFactory;
 
     use HasSluggableTranslations;
-    use HasTranslations;
+    use HasTranslatableAttributes;
     use HasUuids;
     use SoftDeletes;
 
@@ -42,6 +42,15 @@ final class Tag extends Model
     public function getTable(): string
     {
         return (string) config('posts.tables.tags', 'post_tags');
+    }
+
+    /** @return array<string, string> */
+    protected function casts(): array
+    {
+        return [
+            'name' => 'array',
+            'slug' => 'array',
+        ];
     }
 
     /** @return BelongsToMany<Post, $this> */
