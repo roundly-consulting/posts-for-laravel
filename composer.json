@@ -1,12 +1,15 @@
 {
     "name": "roundly-consulting/posts-for-laravel",
-    "description": "Store text, image, and video posts with media attachments and attach them to any author model.",
+    "description": "A modern, multilingual, SEO-ready blog/posts engine for Laravel with translatable content, a publishing lifecycle, categories, tags, and media.",
     "keywords": [
         "roundly-consulting",
         "laravel",
         "posts",
-        "media",
-        "wall"
+        "blog",
+        "cms",
+        "translatable",
+        "seo",
+        "media"
     ],
     "homepage": "https://github.com/roundly-consulting/posts-for-laravel",
     "license": "MIT",
@@ -21,7 +24,8 @@
         "php": "^8.4",
         "illuminate/contracts": "^12.0|^13.0",
         "acme/laravel-medialibrary": "^11.0",
-        "acme/laravel-package-tools": "^1.16"
+        "acme/laravel-package-tools": "^1.16",
+        "acme/laravel-translatable": "^6.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.0",
