@@ -5,36 +5,47 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Posts;
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Posts\Commands\PublishScheduledPostsCommand;
 use RoundlyConsulting\Posts\Models\Post;
-use Acme\LaravelPackageTools\Package;
-use Acme\LaravelPackageTools\PackageServiceProvider;
 
-final class PostsServiceProvider extends PackageServiceProvider
+final class PostsServiceProvider extends ServiceProvider
 {
-    public function configurePackage(Package $package): void
+    public function register(): void
     {
-        $package
-            ->name('posts')
-            ->hasConfigFile()
-            ->hasViews()
-            ->hasTranslations()
-            ->hasMigrations([
-                'create_posts_table',
-                'create_post_categories_table',
-                'create_category_post_table',
-                'create_post_tags_table',
-                'create_post_tag_table',
-            ])
-            ->hasCommands([
-                PublishScheduledPostsCommand::class,
-            ]);
+        $this->mergeConfigFrom(__DIR__.'/../config/posts.php', 'posts');
     }
 
-    public function packageBooted(): void
+    public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'posts');
+        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'posts');
+
         if ((bool) config('posts.slugs.route-binding', true)) {
             Route::model('post', Post::class);
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                PublishScheduledPostsCommand::class,
+            ]);
+
+            $this->publishes([
+                __DIR__.'/../config/posts.php' => config_path('posts.php'),
+            ], 'posts-config');
+
+            $this->publishes([
+                __DIR__.'/../database/migrations' => database_path('migrations'),
+            ], 'posts-migrations');
+
+            $this->publishes([
+                __DIR__.'/../resources/views' => base_path('resources/views/vendor/posts'),
+            ], 'posts-views');
+
+            $this->publishes([
+                __DIR__.'/../resources/lang' => $this->app->langPath('vendor/posts'),
+            ], 'posts-translations');
         }
     }
 }
