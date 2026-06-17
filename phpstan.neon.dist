@@ -1,0 +1,22 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 7
+    paths:
+        - src
+        - config
+        - database
+    checkOctaneCompatibility: true
+    checkModelProperties: true
+    # env() in config files is the documented Laravel idiom; the package's
+    # config/ is its real config directory, so this rule is a false positive here.
+    noEnvCallsOutsideOfConfig: false
+    ignoreErrors:
+        # HasPosts is a public, consumer-facing trait: host-app models (e.g. the
+        # application's User model) apply it. Those classes live outside this
+        # package, so PHPStan can never observe it "used" in source. It is fully
+        # exercised by the test suite (100% coverage).
+        -
+            identifier: trait.unused
+            path: src/Concerns/HasPosts.php
