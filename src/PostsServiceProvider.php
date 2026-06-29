@@ -4,16 +4,22 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Posts;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Posts\Commands\PublishScheduledPostsCommand;
+use RoundlyConsulting\Posts\Events\PostPublished;
+use RoundlyConsulting\Posts\Listeners\WarmPostMediaVariants;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Support\ContentMediaRenderer;
 
 final class PostsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/posts.php', 'posts');
+
+        $this->app->singleton(ContentMediaRenderer::class);
     }
 
     public function boot(): void
@@ -25,6 +31,8 @@ final class PostsServiceProvider extends ServiceProvider
         if ((bool) config('posts.slugs.route-binding', true)) {
             Route::model('post', Post::class);
         }
+
+        Event::listen(PostPublished::class, WarmPostMediaVariants::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

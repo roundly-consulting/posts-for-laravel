@@ -25,7 +25,7 @@ final class JsonLdBuilder
             'description' => $seo->metaDescription ?? '',
         ];
 
-        if ($seo->ogImage !== null) {
+        if (is_string($seo->ogImage) && $seo->ogImage !== '') {
             $data['image'] = $seo->ogImage;
         }
 

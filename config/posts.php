@@ -127,4 +127,53 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Media
+    |--------------------------------------------------------------------------
+    |
+    | Integration with roundly-consulting/media-library-for-laravel. A post owns
+    | three media buckets: a single-file "featured" image, a multi-file "gallery",
+    | and a "content" bucket holding the media referenced inline by [media:UUID]
+    | tokens in the post body. Inline tokens resolve ONLY against the post's own
+    | content bucket, never arbitrary global media.
+    |
+    */
+
+    'media' => [
+
+        // Bucket names the post registers on the media-library model.
+        'featured_bucket' => 'featured',
+        'gallery_bucket' => 'gallery',
+        'content_bucket' => 'content',
+
+        // Disk for the post's media. null => the media-library default disk.
+        'disk' => env('POSTS_MEDIA_DISK'),
+
+        // Fallback URL returned by featuredImageUrl() when no featured image is set.
+        // null => an empty string is returned instead.
+        'featured_fallback_url' => env('POSTS_MEDIA_FEATURED_FALLBACK'),
+
+        // Responsive width ladder for featured/gallery/content images.
+        // null => the media-library default ladder (config('media.responsive.widths')).
+        'responsive_widths' => null,
+
+        // Fall back the SEO og:image / JSON-LD image to the featured image URL
+        // when no explicit og:image is set on the post.
+        'seo_og_image' => true,
+
+        // Variant name used for the og:image fallback ('' => the original).
+        'og_variant' => '',
+
+        // Dispatch a queued media GenerateVariantsJob for the post's media on publish.
+        'warm_on_publish' => true,
+
+        // Inline [media:UUID] / [media:UUID|variant] rendering in the post body.
+        'inline' => [
+            'enabled' => true,
+            'default_variant' => '',
+            'on_missing' => 'strip', // 'strip' | 'keep'
+        ],
+    ],
+
 ];

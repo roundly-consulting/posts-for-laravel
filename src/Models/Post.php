@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
+use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\Posts\Concerns\HasPostMedia;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\PostFactory;
@@ -48,11 +50,12 @@ use RoundlyConsulting\Posts\Support\JsonLdBuilder;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  */
-final class Post extends Model
+final class Post extends Model implements HasMedia
 {
     /** @use HasFactory<PostFactory> */
     use HasFactory;
 
+    use HasPostMedia;
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use HasUuids;
@@ -264,7 +267,7 @@ final class Post extends Model
             canonical: $base->canonical,
             ogTitle: $base->ogTitle ?? $base->metaTitle,
             ogDescription: $base->ogDescription ?? $base->metaDescription,
-            ogImage: $base->ogImage,
+            ogImage: $base->ogImage ?? $this->fallbackOgImage(),
             ogType: $base->ogType ?? 'article',
             twitterCard: $base->twitterCard ?? (string) config('posts.seo.default-card', 'summary_large_image'),
             twitterSite: $base->twitterSite ?? self::stringConfig('posts.seo.twitter-site'),
@@ -342,6 +345,18 @@ final class Post extends Model
         $this->status = $status;
         $this->published_at = $publishedAt !== null ? CarbonImmutable::instance($publishedAt) : null;
         $this->save();
+    }
+
+    /** The featured image URL used as the og:image fallback, or null when unavailable/disabled. */
+    private function fallbackOgImage(): ?string
+    {
+        if (! (bool) config('posts.media.seo_og_image', true)) {
+            return null;
+        }
+
+        $url = $this->featuredImageUrl((string) config('posts.media.og_variant', ''));
+
+        return $url !== '' ? $url : null;
     }
 
     private static function stringConfig(string $key): ?string
