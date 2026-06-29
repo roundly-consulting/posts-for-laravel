@@ -22,7 +22,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "../media-library-for-laravel",
+            "url": "../media-library-for-laravel*",
             "options": {
                 "symlink": true
             }
