@@ -83,6 +83,18 @@ The published `config/posts.php`:
 | `json-ld.author-attribute` | string | `name` | — | Author model attribute used for the author name. |
 | `json-ld.publisher.name` | ?string | `null` | `POSTS_PUBLISHER_NAME` | Publisher organisation name. |
 | `json-ld.publisher.logo` | ?string | `null` | `POSTS_PUBLISHER_LOGO` | Publisher logo URL. |
+| `media.featured_bucket` | string | `featured` | — | Single-file featured-image bucket name. |
+| `media.gallery_bucket` | string | `gallery` | — | Multi-file gallery bucket name. |
+| `media.content_bucket` | string | `content` | — | Bucket owning media referenced inline by `[media:UUID]`. |
+| `media.disk` | ?string | `null` | `POSTS_MEDIA_DISK` | Disk for post media (`null` = media-library default). |
+| `media.featured_fallback_url` | ?string | `null` | `POSTS_MEDIA_FEATURED_FALLBACK` | URL `featuredImageUrl()` returns when no featured image is set. |
+| `media.responsive_widths` | ?list<int> | `null` | — | Responsive width ladder (`null` = media-library default). |
+| `media.seo_og_image` | bool | `true` | — | Fall back `og:image`/JSON-LD `image` to the featured image. |
+| `media.og_variant` | string | `''` | — | Variant used for the og:image fallback (`''` = original). |
+| `media.warm_on_publish` | bool | `true` | — | Queue variant generation for the post's media on publish. |
+| `media.inline.enabled` | bool | `true` | — | Expand `[media:UUID]` tokens in rendered content. |
+| `media.inline.default_variant` | string | `''` | — | Variant applied to inline tokens with no `\|variant`. |
+| `media.inline.on_missing` | `strip`\|`keep` | `strip` | — | Drop or keep tokens whose media is missing/unauthorized. |
 
 ## Usage
 
@@ -244,9 +256,48 @@ app(CreatePostAction::class)->execute(new CreatePostData(
 `PostPublished`, `PostScheduled`, `PostArchived`, `PostDrafted` (each carrying the `postId`)
 are dispatched on the matching transition — listen for them to extend behaviour.
 
-> **Media:** post image/video attachments are intentionally **not** part of this package. A
-> dedicated in-house media package for Laravel will cover that separately. Until then, set
-> `og:image` (and any post imagery) explicitly via `SeoData` / your own storage.
+### Media (integrates with media-library)
+
+Posts builds on
+[`roundly-consulting/media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel)
+(pulled in automatically — its service provider auto-discovers). The bundled `Post` owns three
+media buckets via the `HasPostMedia` concern: a single-file **featured** image, a multi-file
+**gallery**, and a **content** bucket holding the media referenced inline by the post body.
+
+```php
+use Illuminate\Http\UploadedFile;
+
+// Featured image (single-file — a new attach replaces the previous one)
+$post->addMedia($request->file('cover'))->toMediaBucket($post->featuredBucket());
+$post->featuredImage();          // ?Media
+$post->featuredImageUrl();       // string ('' or the configured fallback when empty)
+
+// Gallery (multi-file, order preserved)
+$post->addMedia($file)->toMediaBucket($post->galleryBucket());
+$post->galleryImages();          // Collection<int, Media>
+$post->galleryImageUrls();       // list<string>
+```
+
+**Inline media in content.** Drop `[media:UUID]` (or `[media:UUID|variant]`) tokens into the post
+body, attach those files to the post's content bucket, then render. Images become responsive
+`<img>` tags, other files become links; tokens resolve in a **single batched query** against the
+post's **own** content media only (never an arbitrary global UUID), and a missing/unauthorized
+token is silently stripped (or kept — see `posts.media.inline.on_missing`):
+
+```php
+$image = $post->addMedia($file)->toMediaBucket($post->contentBucket());
+$post->setTranslation('content', 'en', "Intro [media:{$image->uuid}] outro")->save();
+
+{!! $post->renderContent() !!}        // current locale
+{!! $post->renderContent('sk') !!}    // a specific locale
+```
+
+**SEO fallback.** When a post has no explicit `og:image`, `seo()->ogImage` and the JSON-LD `image`
+fall back to the featured image URL (toggle with `posts.media.seo_og_image`).
+
+**Warm variants on publish.** Publishing a post dispatches a queued media `GenerateVariantsJob`
+for its featured/gallery/content media so responsive derivatives are ready when it goes live
+(toggle with `posts.media.warm_on_publish`).
 
 ## Migrating from the previous version (pre-release)
 
