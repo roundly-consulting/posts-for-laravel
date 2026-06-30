@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Posts\Enums;
 
 use Illuminate\Database\Schema\Blueprint;
+use RoundlyConsulting\Enums\Helpers;
 use RoundlyConsulting\Posts\Exceptions\InvalidAuthorKeyTypeException;
 
 enum PostsAuthorKeyType: string
 {
+    use Helpers;
+
     case Bigint = 'bigint';
     case Uuid = 'uuid';
 

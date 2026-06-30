@@ -26,7 +26,6 @@ final class PostsServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'posts');
-        $this->loadTranslationsFrom(__DIR__.'/../resources/lang', 'posts');
 
         if ((bool) config('posts.slugs.route-binding', true)) {
             Route::model('post', Post::class);
@@ -50,10 +49,6 @@ final class PostsServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../resources/views' => base_path('resources/views/vendor/posts'),
             ], 'posts-views');
-
-            $this->publishes([
-                __DIR__.'/../resources/lang' => $this->app->langPath('vendor/posts'),
-            ], 'posts-translations');
         }
     }
 }

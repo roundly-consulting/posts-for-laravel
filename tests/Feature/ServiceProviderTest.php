@@ -28,7 +28,3 @@ it('renders package views', function (): void {
     expect(view()->exists('posts::meta'))->toBeTrue()
         ->and(view()->exists('posts::json-ld'))->toBeTrue();
 });
-
-it('registers status translations', function (): void {
-    expect(trans('posts::statuses.draft'))->toBe('Draft');
-});

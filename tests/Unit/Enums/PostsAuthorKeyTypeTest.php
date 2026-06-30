@@ -48,3 +48,14 @@ it('builds a uuid column', function (): void {
 
     expect(Schema::hasColumn('author_key_uuid', 'author_id'))->toBeTrue();
 });
+
+it('exposes enums-trait helpers for labels, options and validation', function (): void {
+    expect(PostsAuthorKeyType::labels()->all())->toBe(['Bigint', 'Uuid'])
+        ->and(PostsAuthorKeyType::values()->all())->toBe(['bigint', 'uuid'])
+        ->and(PostsAuthorKeyType::toOptions()->all())->toBe([
+            'bigint' => 'Bigint',
+            'uuid' => 'Uuid',
+        ])
+        ->and(PostsAuthorKeyType::validationRule())->toBe('in:bigint,uuid')
+        ->and(PostsAuthorKeyType::Uuid->label())->toBe('Uuid');
+});
