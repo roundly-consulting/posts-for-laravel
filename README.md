@@ -37,12 +37,11 @@ php artisan vendor:publish --tag="posts-migrations"
 php artisan migrate
 ```
 
-Optionally publish the config, views, and translations:
+Optionally publish the config and views:
 
 ```bash
 php artisan vendor:publish --tag="posts-config"
 php artisan vendor:publish --tag="posts-views"
-php artisan vendor:publish --tag="posts-translations"
 ```
 
 > **Author key type is fixed at first migrate.** The `author_id` column type is generated from
@@ -171,6 +170,11 @@ php artisan posts:publish-scheduled
 $schedule->command('posts:publish-scheduled')->everyMinute();
 ```
 
+`PostStatus` (and the `PostsAuthorKeyType` config enum) build on
+[`roundly-consulting/enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel),
+so every case ships readable labels, select options, lookups, and a ready-made validation rule
+(see [Status labels & select options](#status-labels--select-options)).
+
 ### Categories and tags
 
 ```php
@@ -255,6 +259,40 @@ app(CreatePostAction::class)->execute(new CreatePostData(
 
 `PostPublished`, `PostScheduled`, `PostArchived`, `PostDrafted` (each carrying the `postId`)
 are dispatched on the matching transition — listen for them to extend behaviour.
+
+### Status labels & select options
+
+Both package enums — `PostStatus` and the `PostsAuthorKeyType` config enum — use the
+[`roundly-consulting/enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel)
+`Helpers` trait (pulled in automatically), so they expose a readable, select-, and validation-ready
+surface with no hand-rolled helpers:
+
+```php
+use RoundlyConsulting\Posts\Enums\PostStatus;
+
+PostStatus::Published->label();   // 'Published' (readable, translatable via __())
+PostStatus::labels();             // ['Draft', 'Scheduled', 'Published', 'Archived']
+PostStatus::values();             // ['draft', 'scheduled', 'published', 'archived']
+
+PostStatus::toOptions();          // ['draft' => 'Draft', ...] for a <select>
+PostStatus::options();            // Collection<EnumOption{ value, label, name }> for JS/Inertia
+
+PostStatus::validationRule();     // 'in:draft,scheduled,published,archived'
+PostStatus::fromName('Published'); // PostStatus::Published
+```
+
+Use it directly in validation so the allow-list never drifts as cases change:
+
+```php
+$request->validate([
+    'status' => ['required', PostStatus::validationRule()],
+]);
+```
+
+Labels pass through Laravel's `__()` helper (headlined from the case value), so you localise them
+in your app's translation files. See the
+[enums-for-laravel README](https://github.com/roundly-consulting/enums-for-laravel) for the full
+trait surface (lookups, equality checks, fluent conditionals, random selection).
 
 ### Media (integrates with media-library)
 
