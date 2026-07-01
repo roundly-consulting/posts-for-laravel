@@ -16,8 +16,11 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
+use RoundlyConsulting\Likes\Contracts\Likeable;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
 use RoundlyConsulting\Posts\Concerns\HasPostMedia;
+use RoundlyConsulting\Posts\Concerns\HasPostReactions;
+use RoundlyConsulting\Posts\Concerns\HasPostReports;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\PostFactory;
@@ -29,6 +32,7 @@ use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Events\PostScheduled;
 use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
 use RoundlyConsulting\Posts\Support\JsonLdBuilder;
+use RoundlyConsulting\Reports\Contracts\Reportable;
 
 /**
  * @property string $id
@@ -50,12 +54,14 @@ use RoundlyConsulting\Posts\Support\JsonLdBuilder;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  */
-final class Post extends Model implements HasMedia
+final class Post extends Model implements HasMedia, Likeable, Reportable
 {
     /** @use HasFactory<PostFactory> */
     use HasFactory;
 
     use HasPostMedia;
+    use HasPostReactions;
+    use HasPostReports;
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use HasUuids;

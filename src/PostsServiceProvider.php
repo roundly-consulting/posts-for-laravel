@@ -9,9 +9,12 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Posts\Commands\PublishScheduledPostsCommand;
 use RoundlyConsulting\Posts\Events\PostPublished;
+use RoundlyConsulting\Posts\Listeners\SyncPostVisibilityFromReports;
 use RoundlyConsulting\Posts\Listeners\WarmPostMediaVariants;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Support\ContentMediaRenderer;
+use RoundlyConsulting\Reports\Events\ReportResolved;
+use RoundlyConsulting\Reports\Events\ReportThresholdReached;
 
 final class PostsServiceProvider extends ServiceProvider
 {
@@ -32,6 +35,10 @@ final class PostsServiceProvider extends ServiceProvider
         }
 
         Event::listen(PostPublished::class, WarmPostMediaVariants::class);
+
+        // Moderation → visibility: upheld reports / threshold crossings auto-unpublish a post.
+        Event::listen(ReportResolved::class, [SyncPostVisibilityFromReports::class, 'handleResolved']);
+        Event::listen(ReportThresholdReached::class, [SyncPostVisibilityFromReports::class, 'handleThresholdReached']);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

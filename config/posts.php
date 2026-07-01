@@ -176,4 +176,29 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Moderation
+    |--------------------------------------------------------------------------
+    |
+    | Integration with roundly-consulting/reports-for-laravel. When a report
+    | against a post is upheld, or the post crosses the global reports threshold
+    | (config('reports.threshold')), the post can be auto-unpublished through its
+    | own lifecycle (re-emitting PostArchived / PostDrafted). Because reports
+    | routes resolution through approvals, this yields multi-moderator moderation
+    | with no extra code. Set both keys to disable auto-moderation entirely.
+    |
+    */
+
+    'moderation' => [
+
+        // Auto-unpublish a post when a report against it is upheld (ReportResolved).
+        // 'archive' | 'draft' | null (disable the resolved path).
+        'on_resolved' => 'archive',
+
+        // Auto-unpublish (archive) a post when its open-report count crosses the
+        // global config('reports.threshold') — reacts to ReportThresholdReached.
+        'auto_unpublish' => true,
+    ],
+
 ];
