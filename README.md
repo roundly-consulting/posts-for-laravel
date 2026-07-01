@@ -22,6 +22,30 @@ resolved through a small package concern, with no third-party runtime dependenci
 - PHP 8.4+
 - Laravel 12 or 13
 
+## Integrates with
+
+Posts builds directly on our own packages (installed automatically as dependencies — their
+service providers auto-discover, so there is nothing extra to register):
+
+- [`enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel) — `PostStatus`
+  and the `PostsAuthorKeyType` config enum adopt its `Helpers` trait
+  (`labels()`/`options()`/`validationRule()`/…). See **Status labels & select options**.
+- [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel) —
+  featured image, gallery and inline `[media:UUID]` content buckets on the bundled `Post`. See
+  **Media**.
+- [`likes-for-laravel`](https://github.com/roundly-consulting/likes-for-laravel) — the `Post` is a
+  `Likeable`: like/unlike/toggle, live + eager counts, popular/trending feed scopes, single-query
+  viewer-state hydration, and a compact like payload. See **Likes & reactions**.
+- [`reports-for-laravel`](https://github.com/roundly-consulting/reports-for-laravel) — the `Post`
+  is a `Reportable`: report-a-post with dedup, typed reasons and guest reports, moderation-queue
+  scopes, and multi-moderator sign-off (routed through
+  [`approvals-for-laravel`](https://github.com/roundly-consulting/approvals-for-laravel), which
+  arrives transitively). Upheld reports / threshold crossings can auto-unpublish a post. See
+  **Reports & moderation**.
+
+All four sit in a strictly lower dependency tier than posts (enums T0 · media/likes/approvals T1 ·
+reports T2 · posts T3), so the dependency graph stays acyclic.
+
 ## Installation
 
 Install the package via Composer:
@@ -94,6 +118,8 @@ The published `config/posts.php`:
 | `media.inline.enabled` | bool | `true` | — | Expand `[media:UUID]` tokens in rendered content. |
 | `media.inline.default_variant` | string | `''` | — | Variant applied to inline tokens with no `\|variant`. |
 | `media.inline.on_missing` | `strip`\|`keep` | `strip` | — | Drop or keep tokens whose media is missing/unauthorized. |
+| `moderation.on_resolved` | `archive`\|`draft`\|`null` | `archive` | — | Auto-unpublish action when a report is upheld (`null` = disable). |
+| `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a post when it crosses the global `reports.threshold`. |
 
 ## Usage
 
@@ -336,6 +362,116 @@ fall back to the featured image URL (toggle with `posts.media.seo_og_image`).
 **Warm variants on publish.** Publishing a post dispatches a queued media `GenerateVariantsJob`
 for its featured/gallery/content media so responsive derivatives are ready when it goes live
 (toggle with `posts.media.warm_on_publish`).
+
+### Likes & reactions (integrates with likes-for-laravel)
+
+The bundled `Post` implements `Likeable` via the `HasPostReactions` concern, so it builds on
+[`likes-for-laravel`](https://github.com/roundly-consulting/likes-for-laravel). The **actor is
+always passed explicitly** — posts never resolves the acting user from the auth guard.
+
+```php
+use RoundlyConsulting\Likes\Facades\Likes;
+
+Likes::actor($user)->like($post);     // like / unlike / toggle
+Likes::actor($user)->toggle($post);   // returns the resulting is-liked state
+Likes::actor($user)->unlike($post);
+
+$post->isLikedBy($user);              // bool
+$post->likesCount();                  // int (uses an eager count when hydrated)
+```
+
+Popular / trending feeds and single-query per-viewer hydration compose as scopes:
+
+```php
+Post::published()->orderByLikesDesc()->limit(10)->get();   // "popular"
+Post::published()->orderByTrending()->get();               // recency-weighted
+
+$feed = Post::published()
+    ->withLikesCount()              // hydrate likes_count
+    ->withLikedState($viewer)       // hydrate is_liked + liked_reaction (pass the viewer)
+    ->latest()
+    ->paginate();
+```
+
+```blade
+@foreach ($feed as $post)
+    {{ $post->is_liked ? '♥' : '♡' }} {{ $post->likes_count }}
+@endforeach
+```
+
+For API/Blade, `likeState()` returns a compact payload (guest viewer → `liked = false`):
+
+```php
+$post->likeState($viewer);
+// => ['count' => 12, 'viewer_state' => ['liked' => true, 'reaction' => 'like'], 'breakdown' => ['like' => 12]]
+```
+
+Typed reactions (love/wow/…) are available by configuring `likes.reactions` on the host; see the
+[likes-for-laravel README](https://github.com/roundly-consulting/likes-for-laravel).
+
+### Reports & moderation (integrates with reports-for-laravel)
+
+The bundled `Post` implements `Reportable` via the `HasPostReports` concern, building on
+[`reports-for-laravel`](https://github.com/roundly-consulting/reports-for-laravel). The **reporter
+is always passed explicitly**.
+
+```php
+use RoundlyConsulting\Reports\Enums\Reason;
+use RoundlyConsulting\Reports\Enums\Status;
+use RoundlyConsulting\Reports\Facades\Reports;
+
+Reports::report($post)
+    ->by($user)
+    ->for(Reason::Spam)
+    ->because('Obvious spam.')
+    ->create();
+
+// Anonymous / guest report:
+Reports::report($post)->asGuest(hash('sha256', $request->ip()))->for('spam')->create();
+```
+
+Dedup, the reason allowlist and reason labels are handled by reports; a duplicate report throws
+`DuplicateReportException`, an unknown reason throws `UnknownReportReasonException`.
+
+Build a "needs review" queue straight off the `Post` query:
+
+```php
+$post->hasBeenReported();                        // bool
+$post->isReportedBy($user);                      // bool
+$post->reportsCount(Status::Pending);            // int
+
+Post::query()->withReportCounts()->get();        // eager reports_count
+Post::query()->mostReported()->paginate();       // by total report count
+Post::query()->reportedMoreThan(5)->get();       // over a threshold
+```
+
+**Multi-moderator sign-off.** Because reports routes resolution through
+[`approvals-for-laravel`](https://github.com/roundly-consulting/approvals-for-laravel), a report can
+require N moderators to agree before it settles:
+
+```php
+use RoundlyConsulting\Approvals\Enums\ApprovalRule;
+
+Reports::moderate($report)->requiring([$alice, $bob])->rule(ApprovalRule::Quorum)->quorum(2)->open();
+
+Reports::resolve($report, by: $alice);              // 1 of 2 — stays open
+Reports::resolve($report, by: $bob, note: 'Spam');  // quorum reached → Resolved
+```
+
+**Moderation → visibility sync.** When a report is **upheld** (`ReportResolved`) or a post crosses
+the global `reports.threshold` (`ReportThresholdReached`), the post is auto-unpublished through its
+own lifecycle, re-emitting `PostArchived` / `PostDrafted`. This is config-gated by
+`posts.moderation` and only ever touches a currently-published post (idempotent), ignoring any
+non-post report subject:
+
+```php
+'moderation' => [
+    'on_resolved' => 'archive',   // 'archive' | 'draft' | null (disable the upheld-report path)
+    'auto_unpublish' => true,     // auto-archive on ReportThresholdReached
+],
+```
+
+Set both to `null` / `false` to disable auto-moderation entirely and drive visibility yourself.
 
 ## Migrating from the previous version (pre-release)
 
