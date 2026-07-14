@@ -79,6 +79,18 @@
             "type": "vcs",
             "url": "https://github.com/roundly-consulting/approvals-for-laravel",
             "no-api": true
+        },
+        {
+            "type": "path",
+            "url": "../package-toolkit-for-laravel*",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "vcs",
+            "url": "https://github.com/roundly-consulting/package-toolkit-for-laravel",
+            "no-api": true
         }
     ],
     "require": {
@@ -130,6 +142,6 @@
             ]
         }
     },
-    "minimum-stability": "stable",
+    "minimum-stability": "dev",
     "prefer-stable": true
 }
