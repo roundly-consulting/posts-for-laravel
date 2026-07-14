@@ -25,6 +25,9 @@
 @if($seo->ogImage)
 <meta property="og:image" content="{{ $seo->ogImage }}">
 @endif
+@if($seo->ogSiteName)
+<meta property="og:site_name" content="{{ $seo->ogSiteName }}">
+@endif
 @if($seo->twitterCard)
 <meta name="twitter:card" content="{{ $seo->twitterCard }}">
 @endif

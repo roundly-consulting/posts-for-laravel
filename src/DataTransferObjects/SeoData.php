@@ -18,6 +18,7 @@ final readonly class SeoData
         public ?string $twitterSite = null,
         public ?string $twitterCreator = null,
         public ?string $robots = null,
+        public ?string $ogSiteName = null,
     ) {}
 
     /**
@@ -39,6 +40,7 @@ final readonly class SeoData
             twitterSite: self::stringOrNull($bag['twitter_site'] ?? null),
             twitterCreator: self::stringOrNull($bag['twitter_creator'] ?? null),
             robots: self::stringOrNull($bag['robots'] ?? null),
+            ogSiteName: self::stringOrNull($bag['og_site_name'] ?? null),
         );
     }
 
@@ -59,6 +61,7 @@ final readonly class SeoData
             'twitter_site' => $this->twitterSite,
             'twitter_creator' => $this->twitterCreator,
             'robots' => $this->robots,
+            'og_site_name' => $this->ogSiteName,
         ];
     }
 
