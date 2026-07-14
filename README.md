@@ -28,8 +28,11 @@ Posts builds directly on our own packages (installed automatically as dependenci
 service providers auto-discover, so there is nothing extra to register):
 
 - [`enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel) — `PostStatus`
-  and the `PostsAuthorKeyType` config enum adopt its `Helpers` trait
-  (`labels()`/`options()`/`validationRule()`/…). See **Status labels & select options**.
+  adopts its `Helpers` trait (`labels()`/`options()`/`validationRule()`/…). See **Status labels &
+  select options**.
+- [`package-toolkit-for-laravel`](https://github.com/roundly-consulting/package-toolkit-for-laravel) —
+  the service provider, the `posts.key_type` schema strategy (bigint/uuid/ulid) and the `posts.model`
+  resolver are the toolkit's.
 - [`media-library-for-laravel`](https://github.com/roundly-consulting/media-library-for-laravel) —
   featured image, gallery and inline `[media:UUID]` content buckets on the bundled `Post`. See
   **Media**.
@@ -54,10 +57,19 @@ Install the package via Composer:
 composer require roundly-consulting/posts-for-laravel
 ```
 
-Publish and run the migrations (set your author key type first — see Configuration):
+Publish and run the migrations. **Migrations are publish-only** — nothing is auto-loaded, so a bare
+`php artisan migrate` will not create the package's tables until you publish them. Set your key type
+first (see Configuration), because the author column type is baked in at publish/migrate time:
 
 ```bash
 php artisan vendor:publish --tag="posts-migrations"
+
+# The packages posts builds on are publish-only too:
+php artisan vendor:publish --tag="media-migrations"
+php artisan vendor:publish --tag="likes-migrations"
+php artisan vendor:publish --tag="reports-migrations"
+php artisan vendor:publish --tag="approvals-migrations"
+
 php artisan migrate
 ```
 
@@ -68,10 +80,10 @@ php artisan vendor:publish --tag="posts-config"
 php artisan vendor:publish --tag="posts-views"
 ```
 
-> **Author key type is fixed at first migrate.** The `author_id` column type is generated from
-> `posts.author.key-type` when the migration runs. Choose `bigint` (default) or `uuid` to match
-> your author model's primary key **before** running `migrate`. Changing it later requires a new
-> additive migration.
+> **Key type is fixed at first migrate.** The `author_id` column type is generated from
+> `posts.key_type` when the migration runs. Choose `bigint` (default), `uuid` or `ulid` to match
+> your author model's primary key **before** running `migrate`; an unrecognized value falls back to
+> `bigint`. Changing it later requires a new additive migration.
 
 > **PostgreSQL:** translatable columns ship as `json`. If you want indexed JSON queries, change
 > them to `jsonb` in the published migration before migrating.
@@ -83,22 +95,20 @@ The published `config/posts.php`:
 | Key | Type | Default | Env | Purpose |
 |---|---|---|---|---|
 | `model` | class-string | `Post::class` | — | The Post model (point at your subclass to extend). |
+| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_KEY_TYPE` | Author morph key column type; anything else falls back to `bigint`. |
 | `tables.posts` | string | `posts` | — | Posts table name. |
 | `tables.categories` | string | `post_categories` | — | Categories table name. |
 | `tables.category_post` | string | `category_post` | — | Category/post pivot table. |
 | `tables.tags` | string | `post_tags` | — | Tags table name. |
 | `tables.tag_post` | string | `post_tag` | — | Tag/post pivot table. |
-| `author.key-type` | `bigint`\|`uuid` | `bigint` | `POSTS_AUTHOR_KEY_TYPE` | Author morph key column type. |
 | `author.morph-name` | string | `author` | — | Morph relation name (`author_type`/`author_id`). |
 | `author.nullable` | bool | `true` | — | Whether a post may have no author. |
-| `locales.default` | string | `app.locale` | `POSTS_DEFAULT_LOCALE` | Default content locale. |
 | `locales.fallback` | string | `app.fallback_locale` | `POSTS_FALLBACK_LOCALE` | Fallback locale for translations/route binding. |
-| `locales.available` | list<string> | `['en']` | — | Locales iterated when generating slugs. |
 | `slugs.source` | string | `title` | — | Attribute slugs are generated from. |
 | `slugs.separator` | string | `-` | — | Slug word separator. |
 | `slugs.unique` | bool | `true` | — | Suffix colliding slugs (`-2`, `-3`, …). |
 | `slugs.route-binding` | bool | `true` | — | Bind `{post:slug}` by the translated slug. |
-| `seo.site-name` | ?string | `null` | `POSTS_SITE_NAME` | Site name for SEO output. |
+| `seo.site-name` | ?string | `null` | `POSTS_SITE_NAME` | Default `og:site_name` (a post can override it). |
 | `seo.twitter-site` | ?string | `null` | `POSTS_TWITTER_SITE` | Default `twitter:site` handle. |
 | `seo.default-card` | string | `summary_large_image` | — | Default Twitter card type. |
 | `seo.default-robots` | string | `index,follow` | — | Default robots directive. |
@@ -196,7 +206,7 @@ php artisan posts:publish-scheduled
 $schedule->command('posts:publish-scheduled')->everyMinute();
 ```
 
-`PostStatus` (and the `PostsAuthorKeyType` config enum) build on
+`PostStatus` builds on
 [`roundly-consulting/enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel),
 so every case ships readable labels, select options, lookups, and a ready-made validation rule
 (see [Status labels & select options](#status-labels--select-options)).
@@ -288,9 +298,9 @@ are dispatched on the matching transition — listen for them to extend behaviou
 
 ### Status labels & select options
 
-Both package enums — `PostStatus` and the `PostsAuthorKeyType` config enum — use the
+The package enum `PostStatus` uses the
 [`roundly-consulting/enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel)
-`Helpers` trait (pulled in automatically), so they expose a readable, select-, and validation-ready
+`Helpers` trait (pulled in automatically), so it exposes a readable, select-, and validation-ready
 surface with no hand-rolled helpers:
 
 ```php
