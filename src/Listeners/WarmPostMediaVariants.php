@@ -9,6 +9,7 @@ use RoundlyConsulting\MediaLibrary\Jobs\GenerateVariantsJob;
 use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Support\PostModel;
 
 /**
  * On PostPublished, (re)warm the post's media variants so responsive derivatives are ready when
@@ -54,14 +55,6 @@ final class WarmPostMediaVariants implements ShouldQueue
 
     private function resolvePost(string $postId): ?Post
     {
-        $model = config('posts.model', Post::class);
-
-        if (! is_string($model) || ! is_a($model, Post::class, true)) {
-            return null;
-        }
-
-        $post = $model::query()->find($postId);
-
-        return $post instanceof Post ? $post : null;
+        return PostModel::query()->find($postId);
     }
 }

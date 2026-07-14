@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use RoundlyConsulting\MediaLibrary\Jobs\GenerateVariantsJob;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Listeners\WarmPostMediaVariants;
 use RoundlyConsulting\Posts\Models\Post;
@@ -70,12 +71,15 @@ it('ignores an unknown post id', function (): void {
     Queue::assertNotPushed(GenerateVariantsJob::class);
 });
 
-it('ignores an unresolvable post model', function (): void {
+it('fails loudly on an unresolvable post model', function (): void {
+    // A garbage `posts.model` used to be swallowed here, so a misconfigured host
+    // silently stopped warming variants. The resolver now says so.
     config()->set('posts.model', 'Not\\A\\Real\\Model');
 
     Queue::fake();
 
-    (new WarmPostMediaVariants)->handle(new PostPublished('00000000-0000-0000-0000-000000000000'));
+    expect(fn () => (new WarmPostMediaVariants)->handle(new PostPublished('00000000-0000-0000-0000-000000000000')))
+        ->toThrow(InvalidConfigurationException::class);
 
     Queue::assertNotPushed(GenerateVariantsJob::class);
 });

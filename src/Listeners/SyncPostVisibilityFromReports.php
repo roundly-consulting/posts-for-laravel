@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Posts\Listeners;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Support\PostModel;
 use RoundlyConsulting\Reports\Events\ReportResolved;
 use RoundlyConsulting\Reports\Events\ReportThresholdReached;
 
@@ -71,17 +72,8 @@ final class SyncPostVisibilityFromReports
 
     private function resolvePost(?Model $subject): ?Post
     {
-        if (! $subject instanceof Model) {
-            return null;
-        }
+        $model = PostModel::class();
 
-        $configured = config('posts.model', Post::class);
-        $model = is_string($configured) ? $configured : Post::class;
-
-        if (! $subject instanceof $model) {
-            return null;
-        }
-
-        return $subject instanceof Post ? $subject : null;
+        return $subject instanceof $model ? $subject : null;
     }
 }

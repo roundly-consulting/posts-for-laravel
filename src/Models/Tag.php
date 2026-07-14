@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\TagFactory;
+use RoundlyConsulting\Posts\Support\PostModel;
 
 /**
  * @property string $id
@@ -57,7 +58,7 @@ final class Tag extends Model
     public function posts(): BelongsToMany
     {
         return $this->belongsToMany(
-            Post::class,
+            PostModel::class(),
             (string) config('posts.tables.tag_post', 'post_tag'),
             'tag_id',
             'post_id',

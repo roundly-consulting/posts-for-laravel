@@ -53,8 +53,11 @@ use RoundlyConsulting\Reports\Contracts\Reportable;
  * @property CarbonInterface|null $created_at
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
+ *
+ * Deliberately not `final`: `config('posts.model')` documents pointing the package
+ * at your own subclass, which `final` would make impossible.
  */
-final class Post extends Model implements HasMedia, Likeable, Reportable
+class Post extends Model implements HasMedia, Likeable, Reportable
 {
     /** @use HasFactory<PostFactory> */
     use HasFactory;
@@ -279,6 +282,7 @@ final class Post extends Model implements HasMedia, Likeable, Reportable
             twitterSite: $base->twitterSite ?? self::stringConfig('posts.seo.twitter-site'),
             twitterCreator: $base->twitterCreator,
             robots: $base->robots ?? (string) config('posts.seo.default-robots', 'index,follow'),
+            ogSiteName: $base->ogSiteName ?? self::stringConfig('posts.seo.site-name'),
         );
     }
 

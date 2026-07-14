@@ -6,7 +6,7 @@ namespace RoundlyConsulting\Posts\Commands;
 
 use Illuminate\Console\Command;
 use RoundlyConsulting\Posts\Enums\PostStatus;
-use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Support\PostModel;
 
 final class PublishScheduledPostsCommand extends Command
 {
@@ -16,7 +16,7 @@ final class PublishScheduledPostsCommand extends Command
 
     public function handle(): int
     {
-        $due = Post::query()
+        $due = PostModel::query()
             ->where('status', PostStatus::Scheduled)
             ->where('published_at', '<=', now())
             ->get();

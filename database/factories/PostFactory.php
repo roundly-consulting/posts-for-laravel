@@ -8,11 +8,24 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Support\PostModel;
 
 /** @extends Factory<Post> */
 final class PostFactory extends Factory
 {
     protected $model = Post::class;
+
+    /**
+     * Build the model the host configured, not the packaged one — otherwise a host
+     * that points `posts.model` at its own subclass still gets a packaged `Post`
+     * out of the factory the package ships.
+     *
+     * @return class-string<Post>
+     */
+    public function modelName(): string
+    {
+        return PostModel::class();
+    }
 
     public function definition(): array
     {

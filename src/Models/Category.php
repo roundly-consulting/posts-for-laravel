@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\CategoryFactory;
+use RoundlyConsulting\Posts\Support\PostModel;
 
 /**
  * @property string $id
@@ -76,7 +77,7 @@ final class Category extends Model
     public function posts(): BelongsToMany
     {
         return $this->belongsToMany(
-            Post::class,
+            PostModel::class(),
             (string) config('posts.tables.category_post', 'category_post'),
             'category_id',
             'post_id',
