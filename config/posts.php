@@ -75,15 +75,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Translatable attributes (title, slug, perex, content, SEO meta and the
-    | taxonomy names) are stored per locale. "available" lists the locales the
-    | package iterates when generating slugs.
+    | taxonomy names) are stored per locale, and read for the application's
+    | current locale. "fallback" is the locale a translation falls back to when
+    | the current one is missing.
     |
     */
 
     'locales' => [
-        'default' => env('POSTS_DEFAULT_LOCALE', config('app.locale', 'en')),
         'fallback' => env('POSTS_FALLBACK_LOCALE', config('app.fallback_locale', 'en')),
-        'available' => ['en'],
     ],
 
     /*
