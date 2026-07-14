@@ -31,8 +31,7 @@ abstract class TestCase extends Orchestra
     protected function defineEnvironment($app): void
     {
         config()->set('database.default', 'testing');
-        config()->set('posts.author.key-type', $this->authorKeyType());
-        config()->set('posts.locales.available', ['en', 'sk']);
+        config()->set('posts.key_type', $this->authorKeyType());
 
         // Media-library: store on a fakeable public disk, use the GD driver, and keep the
         // responsive ladder small so variant generation stays fast under test.
@@ -73,6 +72,11 @@ abstract class TestCase extends Orchestra
 
         Schema::create('uuid_users', function (Blueprint $table): void {
             $table->uuid('id')->primary();
+            $table->string('name');
+        });
+
+        Schema::create('ulid_users', function (Blueprint $table): void {
+            $table->ulid('id')->primary();
             $table->string('name');
         });
     }

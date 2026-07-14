@@ -20,6 +20,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Key Type
+    |--------------------------------------------------------------------------
+    |
+    | The primary-key strategy of the models a post is authored by. It sets the
+    | column type of the author morph key and must match your author model's
+    | primary key: "bigint" (the Laravel default), "uuid" or "ulid". Anything
+    | unrecognized falls back to "bigint". It is fixed when the migration first
+    | runs, so choose it before publishing the migrations.
+    |
+    */
+
+    'key_type' => env('POSTS_KEY_TYPE', 'bigint'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Table Names
     |--------------------------------------------------------------------------
     |
@@ -42,14 +57,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | Posts are authored through a polymorphic relationship, so any model in
-    | your application can be an author. "key-type" controls the column type of
-    | the author_id morph key and must match your author model's primary key
-    | (allowed: "bigint" or "uuid"). It is fixed when the migration first runs.
+    | your application can be an author. "morph-name" names the morph column
+    | pair on the posts table (author_type / author_id) and "nullable" decides
+    | whether a post may exist without an author. The id column's type comes
+    | from "key_type" above.
     |
     */
 
     'author' => [
-        'key-type' => env('POSTS_AUTHOR_KEY_TYPE', 'bigint'),
         'morph-name' => 'author',
         'nullable' => true,
     ],
