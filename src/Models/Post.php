@@ -8,7 +8,6 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -18,6 +17,7 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
 use RoundlyConsulting\Likes\Contracts\Likeable;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasPostMedia;
 use RoundlyConsulting\Posts\Concerns\HasPostReactions;
 use RoundlyConsulting\Posts\Concerns\HasPostReports;
@@ -35,7 +35,7 @@ use RoundlyConsulting\Posts\Support\JsonLdBuilder;
 use RoundlyConsulting\Reports\Contracts\Reportable;
 
 /**
- * @property string $id
+ * @property int|string $id
  * @property PostStatus $status
  * @property CarbonImmutable|null $published_at
  * @property array<string, string> $title
@@ -59,15 +59,15 @@ use RoundlyConsulting\Reports\Contracts\Reportable;
  */
 class Post extends Model implements HasMedia, Likeable, Reportable
 {
+    use HasConfigurableKey;
+
     /** @use HasFactory<PostFactory> */
     use HasFactory;
-
     use HasPostMedia;
     use HasPostReactions;
     use HasPostReports;
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
-    use HasUuids;
     use SoftDeletes;
 
     protected $guarded = [];

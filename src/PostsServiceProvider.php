@@ -68,7 +68,10 @@ final class PostsServiceProvider extends PackageServiceProvider
     {
         return [
             'Model' => class_basename(PostModel::class()),
-            'Key type' => KeyType::fromConfig('posts.key_type')->value,
+            // Two axes, two lines — the ambiguity of a single "Key type" is what let a uuid
+            // posts.id hide behind a bigint author key that was correct all along.
+            'Key type (author)' => KeyType::fromConfig('posts.key_type')->value,
+            'Key type (posts id)' => KeyType::fromConfig('posts.primary_key_type')->value,
             'Author' => (bool) config('posts.author.nullable', true) ? 'OPTIONAL' : 'REQUIRED',
             'Tables' => $this->tables(),
             'Route binding' => $this->switch('posts.slugs.route-binding'),

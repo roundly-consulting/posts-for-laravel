@@ -63,7 +63,7 @@ it('hydrates per-viewer liked state in a single feed query', function (): void {
         ->withLikedState($viewer)
         ->orderBy('id')
         ->get()
-        ->keyBy(fn (Post $post): string => $post->getKey());
+        ->keyBy(fn (Post $post): int|string => $post->getKey());
 
     expect((int) $feed[$liked->getKey()]->is_liked)->toBe(1)
         ->and($feed[$liked->getKey()]->liked_reaction)->toBe('like')

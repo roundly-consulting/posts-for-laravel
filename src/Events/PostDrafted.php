@@ -11,6 +11,6 @@ final class PostDrafted
     use Dispatchable;
 
     public function __construct(
-        public readonly string $postId,
+        public readonly int|string $postId,
     ) {}
 }

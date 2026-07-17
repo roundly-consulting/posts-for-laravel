@@ -80,10 +80,10 @@ php artisan vendor:publish --tag="posts-config"
 php artisan vendor:publish --tag="posts-views"
 ```
 
-> **Key type is fixed at first migrate.** The `author_id` column type is generated from
-> `posts.key_type` when the migration runs. Choose `bigint` (default), `uuid` or `ulid` to match
-> your author model's primary key **before** running `migrate`; an unrecognized value falls back to
-> `bigint`. Changing it later requires a new additive migration.
+> **Key types are fixed at first migrate.** Both `posts.key_type` (your author model's key) and
+> `posts.primary_key_type` (the posts tables' own ids) are read when the migration runs. Choose
+> them **before** running `migrate`; an unrecognized value falls back to `bigint`, and changing
+> either later is a data migration. See [Key types](#key-types).
 
 > **PostgreSQL:** translatable columns ship as `json`. If you want indexed JSON queries, change
 > them to `jsonb` in the published migration before migrating.
@@ -95,7 +95,8 @@ The published `config/posts.php`:
 | Key | Type | Default | Env | Purpose |
 |---|---|---|---|---|
 | `model` | class-string | `Post::class` | — | The Post model (point at your subclass to extend). |
-| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_KEY_TYPE` | Author morph key column type; anything else falls back to `bigint`. |
+| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_KEY_TYPE` | **Outbound**: your *author* model's key type, which sets the `author_id` morph column. Anything else falls back to `bigint`. |
+| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_PRIMARY_KEY_TYPE` | **Inbound**: the key type of posts' *own* tables (posts, tags, categories and their pivots). Anything else falls back to `bigint`. See [Key types](#key-types). |
 | `tables.posts` | string | `posts` | — | Posts table name. |
 | `tables.categories` | string | `post_categories` | — | Categories table name. |
 | `tables.category_post` | string | `category_post` | — | Category/post pivot table. |
@@ -130,6 +131,45 @@ The published `config/posts.php`:
 | `media.inline.on_missing` | `strip`\|`keep` | `strip` | — | Drop or keep tokens whose media is missing/unauthorized. |
 | `moderation.on_resolved` | `archive`\|`draft`\|`null` | `archive` | — | Auto-unpublish action when a report is upheld (`null` = disable). |
 | `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a post when it crosses the global `reports.threshold`. |
+
+### Key types
+
+Posts has **two independent key-type settings**, because there are two different keys and
+they belong to different owners. Mixing them up is easy and expensive, so they are named
+apart:
+
+| Config | Axis | What it types | Who owns the model |
+|---|---|---|---|
+| `key_type` | **outbound** | `author_id` — the morph column pointing *at* your author model | **you** (your `User`, `Team`, …) |
+| `primary_key_type` | **inbound** | `posts.id`, `post_tags.id`, `post_categories.id` + their pivots — the ids *other* things point at | **this package** |
+
+They are genuinely independent: a host with `bigint` users and `uuid` posts is an ordinary
+application, and both default to `bigint`.
+
+```dotenv
+POSTS_KEY_TYPE=uuid            # your User model is uuid-keyed
+POSTS_PRIMARY_KEY_TYPE=bigint  # posts' own ids stay bigint
+```
+
+**Why `primary_key_type` defaults to `bigint`.** A post is a thing other packages point at
+polymorphically — it is likeable, reportable, commentable. A Laravel morph column
+(`$table->morphs('likeable')`) is an unsigned bigint. On a strict engine such as PostgreSQL,
+a `uuid` post id simply will not go into one:
+
+```
+SQLSTATE[22P02]: invalid input syntax for type bigint: "019f6f33-22b8-737f-a581-849e7cdc517a"
+```
+
+SQLite will **not** warn you about this — its type affinity stores the string in an integer
+column silently, so a green SQLite suite proves nothing here. (Note this needs no foreign
+key to go wrong: a polymorphic column cannot carry one.)
+
+> **Constraint:** `primary_key_type` assumes every morph target in your application shares one
+> key type. If you set `POSTS_PRIMARY_KEY_TYPE=uuid`, then every other model your likes /
+> reports / comments point at needs to be uuid-keyed too, and the packages owning those
+> columns need to agree. A mixed application — a `uuid` `Post` and a `bigint` `Comment` both
+> likeable through the same column — is not supported by this package, by Laravel's own
+> `morphs()`/`uuidMorphs()` split, or by anything else. Pick one key type per application.
 
 ## Usage
 

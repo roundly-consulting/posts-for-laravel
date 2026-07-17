@@ -6,21 +6,21 @@ namespace RoundlyConsulting\Posts\Models;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\CategoryFactory;
 use RoundlyConsulting\Posts\Support\PostModel;
 
 /**
- * @property string $id
- * @property string|null $parent_id
+ * @property int|string $id
+ * @property int|string|null $parent_id
  * @property array<string, string> $name
  * @property array<string, string> $slug
  * @property int $position
@@ -33,12 +33,12 @@ use RoundlyConsulting\Posts\Support\PostModel;
  */
 final class Category extends Model
 {
+    use HasConfigurableKey;
+
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
-
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
-    use HasUuids;
     use SoftDeletes;
 
     protected $guarded = [];

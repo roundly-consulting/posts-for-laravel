@@ -6,18 +6,18 @@ namespace RoundlyConsulting\Posts\Models;
 
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\TagFactory;
 use RoundlyConsulting\Posts\Support\PostModel;
 
 /**
- * @property string $id
+ * @property int|string $id
  * @property array<string, string> $name
  * @property array<string, string> $slug
  * @property Collection<int, Post> $posts
@@ -27,12 +27,12 @@ use RoundlyConsulting\Posts\Support\PostModel;
  */
 final class Tag extends Model
 {
+    use HasConfigurableKey;
+
     /** @use HasFactory<TagFactory> */
     use HasFactory;
-
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
-    use HasUuids;
     use SoftDeletes;
 
     protected $guarded = [];

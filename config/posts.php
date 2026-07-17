@@ -20,7 +20,7 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Key Type
+    | Key Type (outbound — the models a post points at)
     |--------------------------------------------------------------------------
     |
     | The primary-key strategy of the models a post is authored by. It sets the
@@ -29,9 +29,36 @@ return [
     | unrecognized falls back to "bigint". It is fixed when the migration first
     | runs, so choose it before publishing the migrations.
     |
+    | This is your AUTHOR model's key type, not the post's own — see
+    | "primary_key_type" below. The two are independent: a host with bigint users
+    | and uuid posts is a perfectly ordinary application.
+    |
     */
 
     'key_type' => env('POSTS_KEY_TYPE', 'bigint'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Primary Key Type (inbound — the posts tables' own ids)
+    |--------------------------------------------------------------------------
+    |
+    | The primary-key strategy of the package's own tables — posts, categories and
+    | tags, plus the pivots and the category parent link that reference them:
+    | "bigint" (the Laravel default), "uuid" or "ulid". Anything unrecognized
+    | falls back to "bigint".
+    |
+    | This is the key OTHER packages' polymorphic columns point at. A morph column
+    | (`likeable_id`, `reportable_id`, ...) defaults to an unsigned bigint, so on a
+    | strict engine such as PostgreSQL a non-bigint post id cannot be liked or
+    | reported at all. Change this only if every morph target in your application
+    | shares the same key type — see "Key types" in the README.
+    |
+    | It is fixed when the migration first runs, so choose it before publishing the
+    | migrations.
+    |
+    */
+
+    'primary_key_type' => env('POSTS_PRIMARY_KEY_TYPE', 'bigint'),
 
     /*
     |--------------------------------------------------------------------------

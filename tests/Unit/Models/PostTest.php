@@ -6,12 +6,12 @@ use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Tests\Support\AuthorTestModel;
 
-it('uses a uuid primary key', function (): void {
+it('uses the configured primary key, defaulting to an auto-incrementing bigint', function (): void {
     $post = Post::factory()->create();
 
     expect($post->getKeyName())->toBe('id')
-        ->and($post->getKey())->toBeString()
-        ->and($post->getIncrementing())->toBeFalse();
+        ->and($post->getKey())->toBeInt()
+        ->and($post->getIncrementing())->toBeTrue();
 });
 
 it('casts the status to the PostStatus enum', function (): void {

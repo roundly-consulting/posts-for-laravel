@@ -63,10 +63,16 @@ it('queues nothing for a post without media', function (): void {
     Queue::assertNotPushed(GenerateVariantsJob::class);
 });
 
+/**
+ * The unknown id must be well-typed for the configured key type (bigint by default). A uuid
+ * string here is not "an unknown post" but a type error: SQLite swallowed it by affinity and
+ * returned null, while Postgres rejects it outright. What this test means to prove is that a
+ * *valid but absent* id warms nothing.
+ */
 it('ignores an unknown post id', function (): void {
     Queue::fake();
 
-    (new WarmPostMediaVariants)->handle(new PostPublished('00000000-0000-0000-0000-000000000000'));
+    (new WarmPostMediaVariants)->handle(new PostPublished(999_999_999));
 
     Queue::assertNotPushed(GenerateVariantsJob::class);
 });

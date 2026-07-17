@@ -5,14 +5,24 @@ declare(strict_types=1);
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 
 return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create((string) config('posts.tables.categories', 'post_categories'), function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->uuid('parent_id')->nullable()->index();
+        $primaryKeyType = KeyType::fromConfig('posts.primary_key_type');
+
+        Schema::create((string) config('posts.tables.categories', 'post_categories'), function (Blueprint $table) use ($primaryKeyType): void {
+            match ($primaryKeyType) {
+                KeyType::BigInt => $table->id(),
+                KeyType::Uuid => $table->uuid('id')->primary(),
+                KeyType::Ulid => $table->ulid('id')->primary(),
+            };
+
+            // Self-referential: must track the primary key above or the tree breaks.
+            $table->ownerKey('parent_id', $primaryKeyType, nullable: true, index: true);
+
             $table->jsonb('name')->nullable();
             $table->jsonb('slug')->nullable();
             $table->unsignedInteger('position')->default(0);

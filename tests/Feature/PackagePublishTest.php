@@ -66,10 +66,14 @@ it('registers the posts view namespace', function (): void {
 it('contributes a section to about', function (): void {
     Artisan::call('about', ['--only' => 'posts']);
 
+    // Both key axes must surface by name. A single "Key type" line is what let a uuid
+    // posts.id hide behind an author key that was correct all along — a host reading the
+    // section had no way to see which key it was being told about.
     expect(Artisan::output())
         ->toContain('Model')
         ->toContain('Post')
-        ->toContain('Key type')
+        ->toContain('Key type (author)')
+        ->toContain('Key type (posts id)')
         ->toContain('bigint');
 });
 

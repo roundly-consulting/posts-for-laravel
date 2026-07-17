@@ -53,7 +53,7 @@ final class WarmPostMediaVariants implements ShouldQueue
         GenerateVariantsJob::dispatch((int) $media->getKey(), $variantNames);
     }
 
-    private function resolvePost(string $postId): ?Post
+    private function resolvePost(int|string $postId): ?Post
     {
         return PostModel::query()->find($postId);
     }
