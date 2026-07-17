@@ -13,10 +13,23 @@ use RoundlyConsulting\Posts\Tests\Support\CustomPost;
  */
 abstract class ConfiguredPostTestCase extends TestCase
 {
-    protected function defineEnvironment($app): void
+    /**
+     * This used to override `defineEnvironment()` (with `parent::`, so it was not the silent
+     * decapitation step 3a warns about). It moves to `configBeforeBoot()` anyway: that is the
+     * hook the base case exposes for exactly this, and it removes the standing hazard that a
+     * later edit drops the `parent::` call and quietly leaves DriverMatrix unconfigured — a
+     * "pgsql" leg running sqlite, with no error and no red.
+     *
+     * Note `array_merge(parent::configBeforeBoot(), …)`: dropping it would silently discard
+     * the base case's two key-type axes and its media wiring — the same decapitation one
+     * level down.
+     *
+     * @return array<string, mixed>
+     */
+    protected function configBeforeBoot(): array
     {
-        parent::defineEnvironment($app);
-
-        config()->set('posts.model', CustomPost::class);
+        return array_merge(parent::configBeforeBoot(), [
+            'posts.model' => CustomPost::class,
+        ]);
     }
 }

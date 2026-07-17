@@ -9,7 +9,13 @@ use RoundlyConsulting\Posts\Tests\UlidPostTestCase;
 use RoundlyConsulting\Posts\Tests\UuidAuthorTestCase;
 use RoundlyConsulting\Posts\Tests\UuidPostTestCase;
 
-uses(TestCase::class)->in(__DIR__.'/Unit', __DIR__.'/Feature');
+// ArchTest.php is bound by FILE path — `uses()->in()` accepts one — because
+// `swappableModelsAreNotFinal` reads the `posts.model` config default and so needs the app
+// booted. An arch file is not automatically test-cased: passkeys' ArchTest was bound to
+// nothing at all and its finality preset could never read a config default. It rides the
+// DEFAULT base case deliberately, because that preset asserts the config *default* — the
+// Configured/ directory below has swapped it away.
+uses(TestCase::class)->in(__DIR__.'/Unit', __DIR__.'/Feature', __DIR__.'/ArchTest.php');
 
 // The OUTBOUND axis — the key type of the host's author models.
 uses(UuidAuthorTestCase::class)->in(__DIR__.'/UuidAuthor');

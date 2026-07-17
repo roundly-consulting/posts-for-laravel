@@ -2,157 +2,79 @@
 
 declare(strict_types=1);
 
-use Illuminate\Support\Arr;
-
 /**
- * The config contract, pinned in BOTH directions.
+ * C — the config contract, pinned in both directions.
  *
- * - Forward: a key the code reads but the package never ships is unreachable —
- *   the host can never turn the feature on.
- * - Reverse: a key the package ships but no code reads is a documented feature
- *   that silently does nothing. That is how `posts.seo.site-name` shipped an
- *   og:site_name that was never rendered, and how the two dead `posts.locales.*`
- *   keys survived.
+ * This file replaces ~160 lines of hand-rolled reinvention: the suite carried its own
+ * `scrapePostsKeys()` tokenizer, its own `shippedPostsKeys()` flattener, its own forward and
+ * reverse cases, its own "bites on a shipped key nothing reads" self-test, and its own
+ * stray-literal seam check. The ideas were right — it tokenized rather than regexed (the trap
+ * media #27 fell into) and it even wrote its own bite proof — and that is exactly why they
+ * should be the shared implementation rather than this package's copy of them.
  *
- * Keys are scraped from real **string tokens**, never the file text — a docblock
- * mentioning a key is NOT a read, and a regex over raw text lets a dead key pass
- * vacuously.
+ * What the local version could not do, and the preset does:
+ *  - it counted only `'posts.…'` string literals, so an injected `Repository::get()` or a
+ *    `Config::get()` read was invisible to it;
+ *  - it silently ignored interpolated keys instead of flagging them as uncheckable — an
+ *    unresolvable key makes the read-set unsound, so reverse findings computed from it would
+ *    be invented dead keys;
+ *  - its prefix matching treated a read of `posts.seo` as covering every `posts.seo.*` leaf,
+ *    so a dead leaf under a read parent was invisible;
+ *  - `allowUnread`/`allowUnshipped` are rot-proof here — a stale entry that silences nothing
+ *    is itself a failure. A hand-rolled skip list rots quietly.
+ *  - the reverse direction now prints the directories it searched and states that a key read
+ *    elsewhere is NOT proven dead, so a scope gap cannot be mistaken for a dead key and
+ *    invite a destructive "fix".
+ *
+ * The `it('bites on a shipped key nothing reads')` self-test is deliberately not carried over:
+ * it re-implemented the check against a locally-constructed array rather than exercising the
+ * real one, so it proved its own copy of the logic. The reverse direction is bite-proved
+ * against the shipped config instead, in the row's commit.
+ *
+ * The stray-literal seam check is not carried over either — `ArchPresets::modelsResolveThroughSeam`
+ * in tests/ArchTest.php does that AND bans the late-static-binding half (`static::query()` /
+ * `new static` resolving the *called* class rather than the configured one — permissions #34),
+ * which the local version never checked.
+ *
+ * The bugs both directions exist for:
+ *  - forward — shops #18: the whole store-credit feature read `shops.payments.*` while the
+ *    file shipped `payment.*`; 330 tests stayed green because the suite set the same wrong key.
+ *  - reverse — this package's own: `posts.seo.site-name` shipped an og:site_name that was
+ *    never rendered, and two dead `posts.locales.*` keys survived.
+ *
+ * `resources/` is deliberately NOT passed as a third srcDir. It was tried, and removing it
+ * again changed nothing: the two Blade views (`meta`, `json-ld`) read no config at all — they
+ * are handed everything by the renderer. The scraper already auto-scans `routes/` and
+ * `database/`, so the reasoning that widened it (the `git.webhooks.middleware` near-miss, where
+ * a key read from `routes/` scraped as *dead* and I nearly had it deleted) is satisfied here
+ * without an extra entry. An unproven srcDir is the same shape as an unproven
+ * `extraReadPrefixes` entry: it is not rot-checked, so it can never announce that it silences
+ * nothing. Narrower is better — if a view ever reads config, add it back and this note is the
+ * reason to check.
  */
+it('ships exactly the config keys it reads', function (): void {
+    expect(__DIR__.'/../../config/posts.php')->toSatisfyConfigContract(
+        [__DIR__.'/../../src', __DIR__.'/../../database'],
+        [
+            // Three real reads that are not `config(` tokens, so the prefix is what makes them
+            // visible to the scraper:
+            //  - `posts.model` goes through the toolkit's `ModelResolver::for(…)` seam (via
+            //    Support\PostModel);
+            //  - `posts.key_type` and `posts.primary_key_type` go through `KeyType::fromConfig(…)`
+            //    in the migrations, which is what decides the shipped column types.
+            //
+            // The last two are the package's two INDEPENDENT key axes and must never be
+            // conflated: `key_type` describes the HOST's author model (outbound — somebody
+            // else's table, which posts' `author` morph points at), `primary_key_type`
+            // describes posts' OWN tables (inbound — what other packages' morph columns point
+            // at). A single key cannot express both.
+            'extraReadPrefixes' => ['posts.'],
 
-/** @return list<string> every `posts.*` string literal in a PHP source tree */
-function scrapePostsKeys(string $directory): array
-{
-    $keys = [];
-
-    /** @var iterable<SplFileInfo> $files */
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory));
-
-    foreach ($files as $file) {
-        if ($file->getExtension() !== 'php') {
-            continue;
-        }
-
-        foreach (token_get_all((string) file_get_contents($file->getPathname())) as $token) {
-            if (! is_array($token) || $token[0] !== T_CONSTANT_ENCAPSED_STRING) {
-                continue;
-            }
-
-            $literal = trim($token[1], "'\"");
-
-            if (preg_match('/^posts\.[a-z0-9_.\-]+$/i', $literal) === 1) {
-                $keys[$literal] = true;
-            }
-        }
-    }
-
-    $found = array_keys($keys);
-    sort($found);
-
-    return $found;
-}
-
-/** @return list<string> every dotted leaf path in the shipped config file */
-function shippedPostsKeys(): array
-{
-    $config = require __DIR__.'/../../config/posts.php';
-
-    $leaves = array_keys(Arr::dot($config));
-    $paths = [];
-
-    foreach ($leaves as $leaf) {
-        // `tables.posts` etc — and every intermediate section, so a code read of a
-        // whole section (e.g. `posts.tables`) is also considered shipped.
-        $segments = explode('.', (string) $leaf);
-        $path = '';
-
-        foreach ($segments as $segment) {
-            $path = $path === '' ? $segment : $path.'.'.$segment;
-            $paths['posts.'.$path] = true;
-        }
-    }
-
-    $shipped = array_keys($paths);
-    sort($shipped);
-
-    return $shipped;
-}
-
-it('reads no config key the package does not ship', function (): void {
-    $read = scrapePostsKeys(__DIR__.'/../../src');
-    $shipped = shippedPostsKeys();
-
-    expect(array_values(array_diff($read, $shipped)))->toBe([]);
-});
-
-it('reads every config key the package ships', function (): void {
-    $read = [
-        ...scrapePostsKeys(__DIR__.'/../../src'),
-        ...scrapePostsKeys(__DIR__.'/../../database'),
-    ];
-
-    // A leaf is "read" when the code names it, or names a section that contains it
-    // (e.g. `config('posts.tables')` covers `posts.tables.posts`).
-    $unread = [];
-
-    foreach (shippedPostsKeys() as $shipped) {
-        $covered = false;
-
-        foreach ($read as $key) {
-            if ($key === $shipped || str_starts_with($shipped, $key.'.') || str_starts_with($key, $shipped.'.')) {
-                $covered = true;
-
-                break;
-            }
-        }
-
-        if (! $covered) {
-            $unread[] = $shipped;
-        }
-    }
-
-    expect($unread)->toBe([]);
-});
-
-it('bites on a shipped key nothing reads', function (): void {
-    // Guard the guard: the reverse check above must actually reject a dead key.
-    $shipped = [...shippedPostsKeys(), 'posts.totally.dead'];
-    $read = scrapePostsKeys(__DIR__.'/../../src');
-
-    $unread = array_values(array_filter(
-        $shipped,
-        function (string $key) use ($read): bool {
-            foreach ($read as $found) {
-                if ($key === $found || str_starts_with($key, $found.'.') || str_starts_with($found, $key.'.')) {
-                    return false;
-                }
-            }
-
-            return true;
-        },
-    ));
-
-    expect($unread)->toContain('posts.totally.dead');
-});
-
-it('resolves the swappable model only through the Support seam', function (): void {
-    // A model key honoured in some call sites and hard-coded in others is the
-    // certificates/media bug. Nothing outside Support/ may name `posts.model`.
-    /** @var iterable<SplFileInfo> $files */
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.'/../../src'));
-
-    $offenders = [];
-
-    foreach ($files as $file) {
-        if ($file->getExtension() !== 'php' || str_contains($file->getPathname(), '/Support/')) {
-            continue;
-        }
-
-        foreach (token_get_all((string) file_get_contents($file->getPathname())) as $token) {
-            if (is_array($token) && $token[0] === T_CONSTANT_ENCAPSED_STRING && trim($token[1], "'\"") === 'posts.model') {
-                $offenders[] = $file->getFilename();
-            }
-        }
-    }
-
-    expect($offenders)->toBe([]);
+            // Deliberately NO `excludeFromReverse` for the provider. The testing README's
+            // example excludes the service provider on the grounds that "a render is not a
+            // read" — but the toolkit's PackageServiceProvider both `contributesToAbout()`
+            // and does real config reads in one file, so excluding it would discard the only
+            // reader of several bound keys and weaken the reverse direction for nothing.
+        ],
+    );
 });

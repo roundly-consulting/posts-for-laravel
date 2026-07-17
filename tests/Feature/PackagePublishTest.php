@@ -63,37 +63,51 @@ it('registers the posts view namespace', function (): void {
         ->and(view()->exists('posts::json-ld'))->toBeTrue();
 });
 
-it('contributes a section to about', function (): void {
-    Artisan::call('about', ['--only' => 'posts']);
-
-    // Both key axes must surface by name. A single "Key type" line is what let a uuid
-    // posts.id hide behind an author key that was correct all along — a host reading the
-    // section had no way to see which key it was being told about.
-    expect(Artisan::output())
-        ->toContain('Model')
-        ->toContain('Post')
-        ->toContain('Key type (author)')
-        ->toContain('Key type (posts id)')
-        ->toContain('bigint');
-});
-
-it('never leaks a configured value into the about section', function (): void {
-    // A blog's config names the host: its tables, its media disk, its publisher and
-    // its site. The section reports presence, switches and counts — never values.
+/**
+ * A — the secret-safe `about` capture.
+ *
+ * Purchases #13 is the bug this exists for: the fleet's most credential-heavy `about` section
+ * was guarded by negative assertions against `app(Kernel::class)->output()`, which returns
+ * `''`. Every "does not leak" check was vacuous. The two local cases this replaces were
+ * already non-vacuous — they captured through `Artisan::call()` + `Artisan::output()` and one
+ * even wrote "guard the guard" above its own positive — but the ordering was a habit rather
+ * than a structure. The preset makes it structural: `mustRender` is required and non-empty,
+ * the capture is asserted non-empty, and every positive is proven present BEFORE any secret is
+ * looked for. A negative-only case cannot be written with it.
+ */
+it('renders both key axes without leaking the host configuration', function (): void {
+    // A blog's config names the host: its tables, its media disk, its publisher and its site.
+    // The section reports presence, switches and counts — never values.
     config()->set('posts.tables.posts', 'acme_intranet_posts');
     config()->set('posts.media.disk', 's3-acme-private');
     config()->set('posts.seo.site-name', 'Acme Intranet');
     config()->set('posts.json-ld.publisher.name', 'Acme Holdings BV');
 
-    Artisan::call('about', ['--only' => 'posts']);
-    $output = Artisan::output();
-
-    // Guard the guard: a positive first, so an empty section cannot pass this test.
-    expect($output)->toContain('CUSTOMISED');
-
-    expect($output)
-        ->not->toContain('acme_intranet_posts')
-        ->not->toContain('s3-acme-private')
-        ->not->toContain('Acme Intranet')
-        ->not->toContain('Acme Holdings BV');
+    expect('posts')->toLeakNoSecrets(
+        secrets: [
+            // A table name is the host's schema; a disk is its infrastructure; the publisher
+            // and site name are its identity. All reported by presence only.
+            'acme_intranet_posts',
+            's3-acme-private',
+            'Acme Intranet',
+            'Acme Holdings BV',
+        ],
+        mustRender: [
+            'Model',
+            'Post',
+            // BOTH key axes must surface by name. A single "Key type" line is what let a uuid
+            // posts.id hide behind an author key that was correct all along — a host reading
+            // the section had no way to see which key it was being told about. These two lines
+            // are the pin that keeps `posts.key_type` (the HOST's author model, outbound) and
+            // `posts.primary_key_type` (posts' own tables, inbound) reported separately. They
+            // are not the same thing and must never be merged.
+            'Key type (author)',
+            'Key type (posts id)',
+            'bigint',
+            // The presence marker that proves the customised lines report rather than sit
+            // empty — without it the secret checks above would be aimed at a section that
+            // might have printed nothing at all.
+            'CUSTOMISED',
+        ],
+    );
 });

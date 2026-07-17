@@ -4,20 +4,29 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Posts\Tests;
 
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-use Orchestra\Testbench\TestCase as Orchestra;
-use ReflectionClass;
+use Illuminate\Support\ServiceProvider;
 use RoundlyConsulting\Approvals\ApprovalsServiceProvider;
 use RoundlyConsulting\Likes\LikesServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
 use RoundlyConsulting\Posts\PostsServiceProvider;
 use RoundlyConsulting\Reports\ReportsServiceProvider;
+use RoundlyConsulting\Testing\PackageTestCase;
 
-abstract class TestCase extends Orchestra
+abstract class TestCase extends PackageTestCase
 {
-    /** @return array<int, class-string> */
-    protected function getPackageProviders($app): array
+    /**
+     * Every provider the suite really needs, in registration order — all four are hard
+     * `require`s a host would auto-discover, and posts genuinely runs on each: media backs
+     * the featured image and gallery buckets, likes backs reactions, reports backs
+     * report-a-post, and approvals backs reports' multi-moderator flow.
+     *
+     * Reports is also what registers the toolkit's `morphKey` blueprint macros that this
+     * package's own migrations call — a latent fatal that was already found and fixed. The
+     * order here is load-bearing for that reason; do not "tidy" posts earlier.
+     *
+     * @return list<class-string<ServiceProvider>>
+     */
+    protected function packageProviders(): array
     {
         return [
             ApprovalsServiceProvider::class,
@@ -28,132 +37,86 @@ abstract class TestCase extends Orchestra
         ];
     }
 
-    protected function defineEnvironment($app): void
+    /**
+     * The migrations, named by **provider class** — never by filename.
+     *
+     * This replaces a hand-rolled `defineDatabaseMigrations()` that reflected on four
+     * providers to find their package roots and then guessed `/database/migrations` beneath
+     * each: exactly what the base case's `LoadsProviderMigrations` concern does once,
+     * correctly, for the whole fleet.
+     *
+     * The three fixture author tables (`users`, `uuid_users`, `ulid_users`) were bare
+     * `Schema::create()` calls here, i.e. outside the migrator and outside every reset. They
+     * are fixture migrations now, so the base case's drop-and-remigrate reset owns them like
+     * any other table.
+     *
+     * @return list<class-string<ServiceProvider>|string>
+     */
+    protected function migrationSources(): array
     {
-        $this->configureConnection();
-
-        // The two independent key axes, both set BEFORE the providers boot and before the
-        // migrations run — the only window that matters, since the migrations read them to
-        // pick column types and the models read them to decide whether to mint an id.
-        config()->set('posts.key_type', $this->authorKeyType());
-        config()->set('posts.primary_key_type', $this->postsKeyType());
-
-        // Media-library: store on a fakeable public disk, use the GD driver, and keep the
-        // responsive ladder small so variant generation stays fast under test.
-        config()->set('media.disk', 'public');
-        config()->set('media.image_driver', 'gd');
-        config()->set('media.responsive.widths', [320, 640]);
+        return [
+            __DIR__.'/database/migrations',
+            PostsServiceProvider::class,
+            MediaLibraryServiceProvider::class,
+            LikesServiceProvider::class,
+            ReportsServiceProvider::class,
+            ApprovalsServiceProvider::class,
+        ];
     }
 
     /**
-     * Point the `testing` connection at whatever engine `TESTING_DB_DRIVER` names, defaulting
-     * to in-memory SQLite.
+     * The two independent key axes, plus the media wiring — all applied BEFORE the providers
+     * boot and before the migrations run, which is the only window that matters: the
+     * migrations read the key types to pick column types, and the models read them to decide
+     * whether to mint an id.
      *
-     * A SQLite-only suite cannot see this package's central schema bug at all: morph columns
-     * carry no foreign keys, so `PRAGMA foreign_keys` is irrelevant, and SQLite's type
-     * affinity stores a uuid string in an INTEGER column without a murmur. Only a strict
-     * engine rejects it. That is why this seam exists and why `run-tests.yml` runs a real
-     * Postgres leg.
+     * This is `configBeforeBoot()` rather than the `defineEnvironment()` override it used to
+     * be. PackageTestCase does its whole job in `defineEnvironment()` — `DriverMatrix::configure()`
+     * + these keys + the model swaps — so an override without `parent::` decapitates the base
+     * case silently: no error, no red, DriverMatrix simply never configured and the pgsql leg
+     * quietly running sqlite. This package's whole reason for having a pgsql leg is that only
+     * a strict engine can tell its key types apart, so that failure would be especially
+     * expensive here.
+     *
+     * The hand-rolled `configureConnection()` is gone: `DriverMatrix::configure()` is the
+     * fleet's version of the same seam, reading the same `TESTING_DB_*` vars, and it also
+     * turns SQLite's foreign-key pragma on — which the local version never did.
+     *
+     * @return array<string, mixed>
      */
-    protected function configureConnection(): void
+    protected function configBeforeBoot(): array
     {
-        $driver = (string) (env('TESTING_DB_DRIVER') ?: 'sqlite');
+        return [
+            'posts.key_type' => $this->authorKeyType(),
+            'posts.primary_key_type' => $this->postsKeyType(),
 
-        if ($driver !== 'sqlite') {
-            config()->set('database.connections.testing', [
-                'driver' => $driver,
-                'host' => env('TESTING_DB_HOST', '127.0.0.1'),
-                'port' => (int) env('TESTING_DB_PORT', 5432),
-                'database' => env('TESTING_DB_DATABASE', 'testing'),
-                'username' => env('TESTING_DB_USERNAME', 'testing'),
-                'password' => env('TESTING_DB_PASSWORD', 'secret'),
-                'charset' => 'utf8',
-                'prefix' => '',
-                'search_path' => 'public',
-                'sslmode' => 'prefer',
-            ]);
-        }
-
-        config()->set('database.default', 'testing');
+            // Media-library: store on a fakeable public disk, use the GD driver, and keep the
+            // responsive ladder small so variant generation stays fast under test.
+            'media.disk' => 'public',
+            'media.image_driver' => 'gd',
+            'media.responsive.widths' => [320, 640],
+        ];
     }
 
-    /** The key type of the host's AUTHOR models — the outbound axis the host owns. */
+    /**
+     * The key type of the host's AUTHOR models — the OUTBOUND axis, which the host owns and
+     * posts points at through its `author` morph.
+     *
+     * Deliberately NOT the same thing as {@see postsKeyType()}, and the two must never be
+     * merged: `posts.key_type` describes somebody else's table, `posts.primary_key_type`
+     * describes ours.
+     */
     protected function authorKeyType(): string
     {
         return 'bigint';
     }
 
-    /** The key type of posts' OWN tables — the inbound axis other packages' morphs point at. */
+    /**
+     * The key type of posts' OWN tables — the INBOUND axis, which other packages' morph
+     * columns point at.
+     */
     protected function postsKeyType(): string
     {
         return 'bigint';
-    }
-
-    protected function defineDatabaseMigrations(): void
-    {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-
-        // Media-library ships the `media` table the post buckets persist into.
-        $mediaPackage = dirname((string) (new ReflectionClass(MediaLibraryServiceProvider::class))->getFileName(), 2);
-        $this->loadMigrationsFrom($mediaPackage.'/database/migrations');
-
-        // Likes ships the `likes` table posts' reactions persist into.
-        $likesPackage = dirname((string) (new ReflectionClass(LikesServiceProvider::class))->getFileName(), 2);
-        $this->loadMigrationsFrom($likesPackage.'/database/migrations');
-
-        // Reports ships the `reports` table posts' report-a-post persists into.
-        $reportsPackage = dirname((string) (new ReflectionClass(ReportsServiceProvider::class))->getFileName(), 2);
-        $this->loadMigrationsFrom($reportsPackage.'/database/migrations');
-
-        // Approvals engine tables back reports' multi-moderator moderation flow.
-        $approvalsPackage = dirname((string) (new ReflectionClass(ApprovalsServiceProvider::class))->getFileName(), 2);
-        $this->loadMigrationsFrom($approvalsPackage.'/database/migrations');
-
-        Schema::create('users', function (Blueprint $table): void {
-            $table->increments('id');
-            $table->string('name');
-        });
-
-        Schema::create('uuid_users', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->string('name');
-        });
-
-        Schema::create('ulid_users', function (Blueprint $table): void {
-            $table->ulid('id')->primary();
-            $table->string('name');
-        });
-    }
-
-    /**
-     * Reset the schema between tests by **dropping every table**, not by rolling back.
-     *
-     * Testbench unwinds each cached migrator with `migrate:rollback`, which calls each
-     * migration's `down()`. Roundly packages ship no `down()` — the standard is forward-only —
-     * and `Migrator::runMigration()` guards `down()` with `method_exists`, so that rollback is
-     * a silent no-op. On in-memory SQLite it never mattered: the database dies with the
-     * connection. On a real engine the tables survive and the *next* test dies on a duplicate
-     * relation, naming an innocent migration.
-     *
-     * Dropping every table reaches the same state with zero `down()`. Emptying the migrator
-     * cache first is what makes Testbench's rollback loop a no-op rather than a competing one.
-     *
-     * @internal Overrides Testbench's teardown hook, dispatched by trait basename.
-     */
-    protected function tearDownInteractsWithMigrations(): void
-    {
-        if ($this->usesSqliteInMemoryDatabaseConnection()) {
-            parent::tearDownInteractsWithMigrations();
-
-            return;
-        }
-
-        $this->cachedTestMigratorProcessors = [];
-
-        parent::tearDownInteractsWithMigrations();
-
-        Schema::connection((string) config('database.default'))->dropAllTables();
-
-        $this->app?->make('db')->purge();
     }
 }
