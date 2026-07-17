@@ -37,6 +37,7 @@ final class Category extends Model
 
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
+
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use SoftDeletes;

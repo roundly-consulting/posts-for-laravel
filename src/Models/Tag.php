@@ -31,6 +31,7 @@ final class Tag extends Model
 
     /** @use HasFactory<TagFactory> */
     use HasFactory;
+
     use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use SoftDeletes;

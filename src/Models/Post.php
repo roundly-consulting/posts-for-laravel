@@ -63,6 +63,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable
 
     /** @use HasFactory<PostFactory> */
     use HasFactory;
+
     use HasPostMedia;
     use HasPostReactions;
     use HasPostReports;
