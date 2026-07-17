@@ -12,8 +12,8 @@ return new class extends Migration
     {
         Schema::create((string) config('posts.tables.tags', 'post_tags'), function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->json('name')->nullable();
-            $table->json('slug')->nullable();
+            $table->jsonb('name')->nullable();
+            $table->jsonb('slug')->nullable();
             $table->timestamps();
             $table->softDeletes();
         });

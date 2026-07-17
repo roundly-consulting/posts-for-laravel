@@ -13,8 +13,8 @@ return new class extends Migration
         Schema::create((string) config('posts.tables.categories', 'post_categories'), function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('parent_id')->nullable()->index();
-            $table->json('name')->nullable();
-            $table->json('slug')->nullable();
+            $table->jsonb('name')->nullable();
+            $table->jsonb('slug')->nullable();
             $table->unsignedInteger('position')->default(0);
             $table->timestamps();
             $table->softDeletes();
