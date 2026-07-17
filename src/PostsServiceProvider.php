@@ -6,6 +6,7 @@ namespace RoundlyConsulting\Posts;
 
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
@@ -20,6 +21,8 @@ use RoundlyConsulting\Reports\Events\ReportThresholdReached;
 
 final class PostsServiceProvider extends PackageServiceProvider
 {
+    use RegistersBlueprintMacros;
+
     public function configurePackage(Package $package): void
     {
         $package
@@ -43,6 +46,13 @@ final class PostsServiceProvider extends PackageServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // The migrations key every id column off the toolkit's `morphKey`/`ownerKey` macros,
+        // so they must exist before the migrations run. This package registered neither and
+        // worked only because `reports` — a dependency that happens to register them — booted
+        // first: an accidental coupling that would have become a fatal the day posts stopped
+        // requiring reports. Registration is idempotent, guarded by `hasMacro()`.
+        $this->registerBlueprintMacros();
 
         if ((bool) config('posts.slugs.route-binding', true)) {
             Route::model('post', PostModel::class());
