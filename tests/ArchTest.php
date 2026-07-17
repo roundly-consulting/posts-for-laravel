@@ -60,6 +60,15 @@ ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Posts');
 ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support', ['posts.model']);
 
 /**
+ * The morph-key seam, guarded. Posts' author column migrated off raw `$table->morphs()` onto
+ * `morphKey($name, KeyType::fromConfig('posts.key_type'))` so a uuid/ulid host keys the author
+ * relation coherently — a hardcoded bigint id breaks those hosts on Postgres, and SQLite type
+ * affinity hides it. This pin reds if a future migration reintroduces a raw morph and bypasses
+ * the seam.
+ */
+ArchPresets::morphColumnsUseTheSeam(__DIR__.'/../database/migrations');
+
+/**
  * The Dependency Policy as a test. No `alsoAllow`: posts' `require` ships only
  * php/illuminate/roundly, and the workflow installs test tooling with `--dev`, so nothing
  * legitimately lands in `require` that this must forgive. If it goes red the graph is wrong —
