@@ -22,8 +22,8 @@ trait HasTranslatableAttributes
      * Read a single locale's value for a translatable attribute.
      *
      * When $useFallbackLocale is true and the requested locale has no value, the
-     * application fallback locale is tried, then the first available translation.
-     * Returns an empty string when nothing is found.
+     * application fallback locale is tried, then the lowest-sorting locale that holds
+     * a value. Returns an empty string when nothing is found.
      */
     public function getTranslation(string $key, string $locale, bool $useFallbackLocale = true): string
     {
@@ -48,6 +48,13 @@ trait HasTranslatableAttributes
                 return $fallbackValue;
             }
         }
+
+        // Last resort: the lowest-sorting locale that holds a value. The key order of a
+        // json/jsonb column is the storage engine's to decide — sqlite keeps insertion
+        // order, Postgres jsonb and MySQL json normalise it — so picking whichever key
+        // came back first would make the visible translation engine-dependent. Sorting
+        // the locales makes the choice the same everywhere.
+        ksort($translations, SORT_STRING);
 
         foreach ($translations as $translation) {
             if ($translation !== '') {

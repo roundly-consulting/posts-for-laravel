@@ -172,7 +172,8 @@ $post->title;                             // same — current-locale value, with
 
 Translations resolve to the requested locale, then the fallback locale
 (`translatable.fallback_locale`, else `posts.locales.fallback`, else `app.fallback_locale`),
-then the first available translation.
+then the lowest-sorting locale that holds a value (a stable choice, independent of the
+order the database returns the JSON keys in).
 
 ### Publishing lifecycle
 

@@ -16,7 +16,7 @@ it('reads a translatable attribute directly in the current locale', function ():
     expect($post->fresh()->title)->toBe('Hello');
 });
 
-it('falls back to the first available translation when neither locale nor fallback match', function (): void {
+it('falls back to a remaining translation when neither locale nor fallback match', function (): void {
     config()->set('translatable.fallback_locale', null);
     config()->set('posts.locales.fallback', null);
     config()->set('app.fallback_locale', null);
@@ -24,6 +24,37 @@ it('falls back to the first available translation when neither locale nor fallba
     $post = new Post;
     $post->setTranslation('title', 'de', 'Hallo');
 
+    expect($post->getTranslation('title', 'fr'))->toBe('Hallo');
+});
+
+it('picks the same last-resort translation regardless of the stored key order', function (): void {
+    config()->set('translatable.fallback_locale', null);
+    config()->set('posts.locales.fallback', null);
+    config()->set('app.fallback_locale', null);
+
+    // The storage engine decides the key order of a json/jsonb column: sqlite keeps
+    // insertion order, while Postgres jsonb and MySQL json normalise it. The last-resort
+    // pick must not depend on it, so the same map in either order resolves identically.
+    $insertionOrder = new Post;
+    $insertionOrder->setRawAttributes(['title' => json_encode(['sk' => 'Ahoj', 'de' => 'Hallo'])]);
+
+    $normalisedOrder = new Post;
+    $normalisedOrder->setRawAttributes(['title' => json_encode(['de' => 'Hallo', 'sk' => 'Ahoj'])]);
+
+    expect($insertionOrder->getTranslation('title', 'fr'))
+        ->toBe($normalisedOrder->getTranslation('title', 'fr'));
+});
+
+it('resolves the last-resort translation by a stable locale sort, not storage order', function (): void {
+    config()->set('translatable.fallback_locale', null);
+    config()->set('posts.locales.fallback', null);
+    config()->set('app.fallback_locale', null);
+
+    $post = new Post;
+    $post->setRawAttributes(['title' => json_encode(['sk' => 'Ahoj', 'de' => 'Hallo', 'at' => ''])]);
+
+    // 'at' sorts first but is empty, so the lowest-sorting non-empty locale wins — never
+    // the first key the engine happens to hand back.
     expect($post->getTranslation('title', 'fr'))->toBe('Hallo');
 });
 
