@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Posts\Support;
 
+use RoundlyConsulting\Sluggable\DataTransferObjects\SlugIndexSpec;
 use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
 use RoundlyConsulting\Sluggable\Enums\EmptySourcePolicy;
 use RoundlyConsulting\Sluggable\Enums\LocaleFallback;
 use RoundlyConsulting\Sluggable\Enums\ManualSlugPolicy;
 use RoundlyConsulting\Sluggable\Enums\UpdatePolicy;
+use RoundlyConsulting\Sluggable\Exceptions\UnsupportedDriverException;
+use RoundlyConsulting\Sluggable\Schema\SlugIndexes;
 
 /**
  * The slug definition posts, categories and tags share: a per-locale `slug` map generated
@@ -37,5 +40,25 @@ final class PostSlugs
             ->includeTrashed();
 
         return (bool) config('posts.slugs.unique', true) ? $definition->unique() : $definition->notUnique();
+    }
+
+    /**
+     * The create migrations' slug indexes: one unique index per supported locale on `slug`,
+     * trashed rows included — the shape {@see definition()} probes — while `posts.slugs.unique`
+     * is on. On an engine sluggable has no index form for (SQL Server) uniqueness stays
+     * application-level, as it was before the indexes existed, instead of aborting the install;
+     * sluggable picks its driver before it runs any DDL, so nothing is half-built.
+     */
+    public static function ensureIndexes(string $table): void
+    {
+        if (! (bool) config('posts.slugs.unique', true)) {
+            return;
+        }
+
+        try {
+            SlugIndexes::ensure(SlugIndexSpec::localeMap($table, 'slug'));
+        } catch (UnsupportedDriverException) {
+            // No per-locale index on this engine; generation and validation still probe.
+        }
     }
 }

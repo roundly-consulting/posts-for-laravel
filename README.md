@@ -86,7 +86,8 @@ php artisan migrate
 > from sluggable (`sluggable.locales.supported`, or translatable-for-laravel's locales when it is
 > installed, else `app.locale` + `app.fallback_locale`) — set it **before** `migrate`. Add
 > locales later with `php artisan sluggable:indexes "RoundlyConsulting\Posts\Models\Post"` (and
-> the same for `Category` and `Tag`).
+> the same for `Category` and `Tag`). On SQL Server, which sluggable cannot index, the index step
+> is skipped and slug uniqueness stays application-level.
 
 Optionally publish the config and views:
 

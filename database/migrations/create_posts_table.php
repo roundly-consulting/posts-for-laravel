@@ -6,8 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
-use RoundlyConsulting\Sluggable\DataTransferObjects\SlugIndexSpec;
-use RoundlyConsulting\Sluggable\Schema\SlugIndexes;
+use RoundlyConsulting\Posts\Support\PostSlugs;
 
 return new class extends Migration
 {
@@ -46,8 +45,6 @@ return new class extends Migration
         // One unique index per supported locale (`slug->en`, `slug->sk`, …), trashed rows
         // included — the same shape the model's slug definition probes. Locales are read
         // from sluggable's SlugLocales now; add later ones with `php artisan sluggable:indexes`.
-        if ((bool) config('posts.slugs.unique', true)) {
-            SlugIndexes::ensure(SlugIndexSpec::localeMap((string) config('posts.tables.posts', 'posts'), 'slug'));
-        }
+        PostSlugs::ensureIndexes((string) config('posts.tables.posts', 'posts'));
     }
 };

@@ -84,3 +84,26 @@ it('retries a slug that lost the race to a concurrent writer', function (): void
         ->and($retries)->toBe(1)
         ->and(Post::query()->count())->toBe(2);
 });
+
+it('still migrates on an engine sluggable cannot index', function (string $migration): void {
+    // SQL Server has no slug-index form in sluggable; the create migrations must fall back to
+    // application-level uniqueness there, not abort the install. The engine is never reached:
+    // the table DDL is faked, and sluggable picks its index driver before it runs any SQL.
+    $default = config('database.default');
+    config()->set('database.connections.sqlsrv_probe', ['driver' => 'sqlsrv', 'host' => 'localhost', 'database' => 'posts', 'prefix' => '']);
+    config()->set('database.default', 'sqlsrv_probe');
+    Schema::shouldReceive('create')->once();
+
+    try {
+        (require __DIR__.'/../../database/migrations/'.$migration)->up();
+        $thrown = null;
+    } catch (Throwable $exception) {
+        $thrown = $exception;
+    } finally {
+        // The base case's reset runs on the default connection after the test.
+        config()->set('database.default', $default);
+        Schema::clearResolvedInstances();
+    }
+
+    expect($thrown)->toBeNull();
+})->with(['create_posts_table.php', 'create_post_categories_table.php', 'create_post_tags_table.php']);
