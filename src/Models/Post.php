@@ -21,7 +21,6 @@ use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasPostMedia;
 use RoundlyConsulting\Posts\Concerns\HasPostReactions;
 use RoundlyConsulting\Posts\Concerns\HasPostReports;
-use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\PostFactory;
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
@@ -32,7 +31,13 @@ use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Events\PostScheduled;
 use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
 use RoundlyConsulting\Posts\Support\JsonLdBuilder;
+use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Reports\Contracts\Reportable;
+use RoundlyConsulting\Sluggable\Concerns\HasSlug;
+use RoundlyConsulting\Sluggable\Contracts\Sluggable;
+use RoundlyConsulting\Sluggable\Definitions\SlugOptions;
+use RoundlyConsulting\Sluggable\Rules\UniqueSlug;
 
 /**
  * @property int|string $id
@@ -57,9 +62,13 @@ use RoundlyConsulting\Reports\Contracts\Reportable;
  * Deliberately not `final`: `config('posts.model')` documents pointing the package
  * at your own subclass, which `final` would make impossible.
  */
-class Post extends Model implements HasMedia, Likeable, Reportable
+class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
 {
-    use HasConfigurableKey;
+    // Both define `resolveRouteBindingQuery()`: sluggable's handles the slug field and keeps
+    // the uuid/ulid malformed-id 404 for key fields, so it wins.
+    use HasConfigurableKey, HasSlug {
+        HasSlug::resolveRouteBindingQuery insteadof HasConfigurableKey;
+    }
 
     /** @use HasFactory<PostFactory> */
     use HasFactory;
@@ -67,7 +76,6 @@ class Post extends Model implements HasMedia, Likeable, Reportable
     use HasPostMedia;
     use HasPostReactions;
     use HasPostReports;
-    use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use SoftDeletes;
 
@@ -163,28 +171,33 @@ class Post extends Model implements HasMedia, Likeable, Reportable
         $query->where('status', PostStatus::Archived);
     }
 
-    /** @param  Builder<Post>  $query */
+    /**
+     * Posts in a category, matched by the category's slug along sluggable's locale chain
+     * (current → fallback → any locale).
+     *
+     * @param  Builder<Post>  $query
+     */
     public function scopeInCategory(Builder $query, Category|string $category): void
     {
-        $slug = $category instanceof Category
-            ? $category->getTranslation('slug', app()->getLocale())
-            : $category;
+        $slug = $category instanceof Category ? (string) $category->currentSlug() : $category;
 
-        $query->whereHas('categories', function (Builder $query) use ($slug): void {
-            $query->getQuery()->where('slug->'.app()->getLocale(), $slug);
-        });
+        $match = Category::query()->whereSlug($slug);
+
+        $query->whereHas('categories', static fn (Builder $query): Builder => $query->mergeConstraintsFrom($match));
     }
 
-    /** @param  Builder<Post>  $query */
+    /**
+     * Posts carrying a tag, matched by the tag's slug along sluggable's locale chain.
+     *
+     * @param  Builder<Post>  $query
+     */
     public function scopeWithTag(Builder $query, Tag|string $tag): void
     {
-        $slug = $tag instanceof Tag
-            ? $tag->getTranslation('slug', app()->getLocale())
-            : $tag;
+        $slug = $tag instanceof Tag ? (string) $tag->currentSlug() : $tag;
 
-        $query->whereHas('tags', function (Builder $query) use ($slug): void {
-            $query->getQuery()->where('slug->'.app()->getLocale(), $slug);
-        });
+        $match = Tag::query()->whereSlug($slug);
+
+        $query->whereHas('tags', static fn (Builder $query): Builder => $query->mergeConstraintsFrom($match));
     }
 
     public function publish(?CarbonInterface $at = null): self
@@ -324,22 +337,30 @@ class Post extends Model implements HasMedia, Likeable, Reportable
         );
     }
 
-    public function resolveRouteBinding($value, $field = null): ?Model
+    /**
+     * The slug definition — per-locale, generated from `posts.slugs.source`, unique per locale
+     * (DB-indexed), bound by the current-locale slug. See {@see PostSlugs}.
+     */
+    public function slugOptions(): SlugOptions
     {
-        if ($field !== null && $field !== 'slug') {
-            return parent::resolveRouteBinding($value, $field);
-        }
+        return SlugOptions::make(
+            PostSlugs::definition((string) config('posts.slugs.source', 'title'))
+                ->keepHistory((bool) config('posts.slugs.history', false))
+                ->lockWhen(fn (Post $post): bool => (bool) config('posts.slugs.lock-when-published', false)
+                    && $post->status === PostStatus::Published)
+                ->routeKey((bool) config('posts.slugs.route-binding', true)),
+        );
+    }
 
-        $locale = app()->getLocale();
-        $fallback = (string) config('posts.locales.fallback', $locale);
-
-        return $this->newQuery()
-            ->where(function (Builder $query) use ($locale, $fallback, $value): void {
-                $query->getQuery()
-                    ->where("slug->{$locale}", $value)
-                    ->orWhere("slug->{$fallback}", $value);
-            })
-            ->first();
+    /**
+     * Validation rules for a host form that accepts a slug map (`slug.en`, `slug.sk`, …):
+     * the same uniqueness check generation uses. Pass the post being edited to ignore it.
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function slugRules(?Post $ignore = null): array
+    {
+        return ['slug' => ['nullable', 'array', UniqueSlug::for(PostModel::class())->ignore($ignore)]];
     }
 
     protected static function newFactory(): PostFactory

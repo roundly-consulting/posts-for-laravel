@@ -10,6 +10,7 @@ use RoundlyConsulting\Likes\LikesServiceProvider;
 use RoundlyConsulting\MediaLibrary\MediaLibraryServiceProvider;
 use RoundlyConsulting\Posts\PostsServiceProvider;
 use RoundlyConsulting\Reports\ReportsServiceProvider;
+use RoundlyConsulting\Sluggable\SluggableServiceProvider;
 use RoundlyConsulting\Testing\PackageTestCase;
 
 abstract class TestCase extends PackageTestCase
@@ -33,6 +34,7 @@ abstract class TestCase extends PackageTestCase
             LikesServiceProvider::class,
             MediaLibraryServiceProvider::class,
             ReportsServiceProvider::class,
+            SluggableServiceProvider::class,
             PostsServiceProvider::class,
         ];
     }
@@ -61,6 +63,8 @@ abstract class TestCase extends PackageTestCase
             LikesServiceProvider::class,
             ReportsServiceProvider::class,
             ApprovalsServiceProvider::class,
+            // Sluggable's publish-only `slug_history` table, for the history/301 cases.
+            SluggableServiceProvider::class,
         ];
     }
 
@@ -95,6 +99,11 @@ abstract class TestCase extends PackageTestCase
             'media.disk' => 'public',
             'media.image_driver' => 'gd',
             'media.responsive.widths' => [320, 640],
+
+            // The locales the per-locale slug indexes are built for at migrate time. Without
+            // this, sluggable derives them from app.locale/app.fallback_locale (just `en`) and
+            // the `sk` cases would run against a column with no index behind it.
+            'sluggable.locales.supported' => ['en', 'sk'],
         ];
     }
 

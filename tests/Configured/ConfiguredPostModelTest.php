@@ -95,3 +95,15 @@ it('warms the media of a host-model post on publish', function (): void {
 
     expect(PostModel::query()->find($post->getKey()))->toBeInstanceOf(CustomPost::class);
 });
+
+it('finds host-model posts by slug through the seam', function (): void {
+    // `Post::findBySlug()` would resolve through late static binding to the packaged class;
+    // the seam's query is what returns the host's model.
+    $post = CustomPost::factory()->withTitles(['en' => 'Seam Lookup'])->create();
+
+    $found = PostModel::query()->whereSlug('seam-lookup')->first();
+
+    expect($found)->toBeInstanceOf(CustomPost::class)
+        ->and($found?->is($post))->toBeTrue()
+        ->and(PostModel::query()->whereSlug('missing')->exists())->toBeFalse();
+});

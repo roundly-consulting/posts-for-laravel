@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use RoundlyConsulting\Posts\Tests\ConfiguredPostTestCase;
+use RoundlyConsulting\Posts\Tests\NonUniqueSlugTestCase;
 use RoundlyConsulting\Posts\Tests\TestCase;
 use RoundlyConsulting\Posts\Tests\UlidAuthorTestCase;
 use RoundlyConsulting\Posts\Tests\UlidPostTestCase;
@@ -21,6 +22,10 @@ uses(TestCase::class)->in(__DIR__.'/Unit', __DIR__.'/Feature', __DIR__.'/ArchTes
 uses(UuidAuthorTestCase::class)->in(__DIR__.'/UuidAuthor');
 uses(UlidAuthorTestCase::class)->in(__DIR__.'/UlidAuthor');
 uses(ConfiguredPostTestCase::class)->in(__DIR__.'/Configured');
+
+// `posts.slugs.unique` decides at MIGRATE time whether the slug indexes exist, so the
+// non-unique install needs its own before-boot base case.
+uses(NonUniqueSlugTestCase::class)->in(__DIR__.'/NonUniqueSlugs');
 
 // The INBOUND axis — the key type of posts' own tables, which other packages' morph columns
 // point at. Fixed at migrate time, so each non-default leg needs its own base case to reach

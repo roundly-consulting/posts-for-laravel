@@ -11,10 +11,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
-use RoundlyConsulting\Posts\Concerns\HasSluggableTranslations;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\TagFactory;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostSlugs;
+use RoundlyConsulting\Sluggable\Concerns\HasSlug;
+use RoundlyConsulting\Sluggable\Contracts\Sluggable;
+use RoundlyConsulting\Sluggable\Definitions\SlugOptions;
 
 /**
  * @property int|string $id
@@ -25,14 +28,16 @@ use RoundlyConsulting\Posts\Support\PostModel;
  * @property CarbonInterface|null $updated_at
  * @property CarbonInterface|null $deleted_at
  */
-final class Tag extends Model
+final class Tag extends Model implements Sluggable
 {
-    use HasConfigurableKey;
+    // Both define `resolveRouteBindingQuery()`; sluggable's keeps the key-field behaviour.
+    use HasConfigurableKey, HasSlug {
+        HasSlug::resolveRouteBindingQuery insteadof HasConfigurableKey;
+    }
 
     /** @use HasFactory<TagFactory> */
     use HasFactory;
 
-    use HasSluggableTranslations;
     use HasTranslatableAttributes;
     use SoftDeletes;
 
@@ -71,8 +76,9 @@ final class Tag extends Model
         return TagFactory::new();
     }
 
-    public function slugSource(): string
+    /** Per-locale slugs from `name`; see {@see PostSlugs}. */
+    public function slugOptions(): SlugOptions
     {
-        return 'name';
+        return SlugOptions::make(PostSlugs::definition('name'));
     }
 }

@@ -76,3 +76,25 @@ it('filters posts with a given tag by translated slug', function (): void {
     expect(Post::query()->withTag($tag)->count())->toBe(1)
         ->and(Post::query()->withTag('php')->count())->toBe(1);
 });
+
+it('matches a category slug along the locale chain', function (): void {
+    // The category only has an English slug; a Slovak request still finds its posts.
+    $category = Category::factory()->create(['name' => ['en' => 'Guides']]);
+    $post = Post::factory()->create();
+    $post->categories()->attach($category);
+
+    app()->setLocale('sk');
+
+    expect(Post::query()->inCategory('guides')->pluck('id')->all())->toBe([$post->getKey()])
+        ->and(Post::query()->inCategory($category)->count())->toBe(1);
+});
+
+it('counts posts by tag on any engine', function (): void {
+    // The slug scopes are predicate-only, so a count over the EXISTS subquery stays valid SQL
+    // on Postgres (no ORDER BY inside an aggregate).
+    $tag = Tag::factory()->create(['name' => ['en' => 'Eloquent']]);
+    Post::factory()->count(2)->create()->each(fn (Post $post) => $post->tags()->attach($tag));
+
+    expect(Post::query()->withTag('eloquent')->count())->toBe(2)
+        ->and(Post::query()->withTag('missing')->count())->toBe(0);
+});

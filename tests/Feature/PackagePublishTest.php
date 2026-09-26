@@ -108,6 +108,9 @@ it('renders both key axes without leaking the host configuration', function (): 
             // empty — without it the secret checks above would be aimed at a section that
             // might have printed nothing at all.
             'CUSTOMISED',
+            // The two slug safety knobs, both off by default.
+            'Slug history',
+            'Slug lock',
         ],
     );
 });

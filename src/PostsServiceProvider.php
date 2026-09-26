@@ -86,6 +86,8 @@ final class PostsServiceProvider extends PackageServiceProvider
             'Tables' => $this->tables(),
             'Route binding' => $this->switch('posts.slugs.route-binding'),
             'Unique slugs' => $this->switch('posts.slugs.unique'),
+            'Slug history' => (bool) config('posts.slugs.history', false) ? 'ON' : 'OFF',
+            'Slug lock' => (bool) config('posts.slugs.lock-when-published', false) ? 'WHEN PUBLISHED' : 'OFF',
             'Media disk' => $this->presence('posts.media.disk', 'MEDIA DEFAULT'),
             'Inline media' => (bool) config('posts.media.inline.enabled', true)
                 ? 'ON (missing: '.$this->onMissing().')'

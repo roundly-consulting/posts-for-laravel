@@ -117,9 +117,21 @@ return [
     | Slugs
     |--------------------------------------------------------------------------
     |
-    | Slugs are generated per locale from the "source" attribute. When "unique"
-    | is enabled, colliding slugs are suffixed (-2, -3, ...). When
-    | "route-binding" is enabled, {post:slug} resolves by the translated slug.
+    | Posts, categories and tags carry a per-locale slug map, handled by
+    | roundly-consulting/sluggable-for-laravel. Post slugs are generated from
+    | "source" (categories and tags from their name) for every locale that has
+    | one, and missing locales are filled on each save that changes the model.
+    |
+    | "unique"       suffix colliding slugs per locale (-2, -3, ...), trashed
+    |                rows included, backed by per-locale unique indexes that
+    |                the create migrations build when this is on at migrate time.
+    | "route-binding" make the post slug the route key: {post} resolves by the
+    |                current locale's slug, then the fallback locale, then any
+    |                locale, and route('...', $post) emits that slug.
+    | "history"      remember retired post slugs and answer old URLs with a 301
+    |                (publish sluggable's migrations first).
+    | "lock-when-published" freeze a post's slugs once it is published: nothing
+    |                regenerates them and a manual change throws.
     |
     */
 
@@ -128,6 +140,8 @@ return [
         'separator' => '-',
         'unique' => true,
         'route-binding' => true,
+        'history' => env('POSTS_SLUG_HISTORY', false),
+        'lock-when-published' => false,
     ],
 
     /*
