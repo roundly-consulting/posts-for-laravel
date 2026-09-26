@@ -172,32 +172,35 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     }
 
     /**
-     * Posts in a category, matched by the category's slug along sluggable's locale chain
-     * (current → fallback → any locale).
+     * Posts in a category. An instance matches by its key; a slug matches the ONE category it
+     * resolves to along sluggable's locale chain — the current locale's match, else the
+     * fallback's, else any locale's (the row `{category}` binding would pick) — never every
+     * category that uses the same slug in some other locale.
      *
      * @param  Builder<Post>  $query
      */
     public function scopeInCategory(Builder $query, Category|string $category): void
     {
-        $slug = $category instanceof Category ? (string) $category->currentSlug() : $category;
+        $match = $category instanceof Category
+            ? $category->getKey()
+            : Category::query()->whereSlug($category)->orderBySlugPreference($category)->limit(1)->select((new Category)->getQualifiedKeyName());
 
-        $match = Category::query()->whereSlug($slug);
-
-        $query->whereHas('categories', static fn (Builder $query): Builder => $query->mergeConstraintsFrom($match));
+        $query->whereHas('categories', static fn (Builder $query): Builder => self::whereTaxonomyKey($query, $match));
     }
 
     /**
-     * Posts carrying a tag, matched by the tag's slug along sluggable's locale chain.
+     * Posts carrying a tag — an instance by its key, a slug by the one tag it resolves to along
+     * the locale chain (see {@see scopeInCategory()}).
      *
      * @param  Builder<Post>  $query
      */
     public function scopeWithTag(Builder $query, Tag|string $tag): void
     {
-        $slug = $tag instanceof Tag ? (string) $tag->currentSlug() : $tag;
+        $match = $tag instanceof Tag
+            ? $tag->getKey()
+            : Tag::query()->whereSlug($tag)->orderBySlugPreference($tag)->limit(1)->select((new Tag)->getQualifiedKeyName());
 
-        $match = Tag::query()->whereSlug($slug);
-
-        $query->whereHas('tags', static fn (Builder $query): Builder => $query->mergeConstraintsFrom($match));
+        $query->whereHas('tags', static fn (Builder $query): Builder => self::whereTaxonomyKey($query, $match));
     }
 
     public function publish(?CarbonInterface $at = null): self
@@ -361,6 +364,23 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     public static function slugRules(?Post $ignore = null): array
     {
         return ['slug' => ['nullable', 'array', UniqueSlug::for(PostModel::class())->ignore($ignore)]];
+    }
+
+    /**
+     * Constrain a category/tag query to one key, or to the key a scalar subquery selects (a
+     * subquery is compared with `=`, never cast to a string key).
+     *
+     * @template TModel of Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  Builder<covariant Model>|int|string|null  $key
+     * @return Builder<TModel>
+     */
+    private static function whereTaxonomyKey(Builder $query, Builder|int|string|null $key): Builder
+    {
+        return $key instanceof Builder
+            ? $query->where($query->getModel()->getQualifiedKeyName(), '=', $key)
+            : $query->whereKey($key);
     }
 
     protected static function newFactory(): PostFactory

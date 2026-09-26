@@ -65,3 +65,17 @@ it('cannot be liked while likes keys its morph column to bigint', function (): v
     fn (): bool => config('database.connections.testing.driver') !== 'pgsql',
     'sqlite type affinity accepts the uuid silently — only a strict engine detects this',
 );
+
+it('filters uuid posts by a category or tag instance and by slug', function (): void {
+    $category = Category::factory()->create(['name' => ['en' => 'Guides']]);
+    $tag = Tag::factory()->create(['name' => ['en' => 'Eloquent']]);
+    $post = Post::factory()->create();
+    $post->categories()->attach($category);
+    $post->tags()->attach($tag);
+    Post::factory()->create();
+
+    expect(Post::query()->inCategory($category)->pluck('id')->all())->toBe([$post->id])
+        ->and(Post::query()->inCategory('guides')->pluck('id')->all())->toBe([$post->id])
+        ->and(Post::query()->withTag($tag)->count())->toBe(1)
+        ->and(Post::query()->withTag('eloquent')->count())->toBe(1);
+});

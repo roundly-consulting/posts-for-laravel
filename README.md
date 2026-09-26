@@ -293,8 +293,11 @@ $guides->descendants();   // [Laravel, …]
 ```
 
 Category and tag `name` and `slug` are both translatable, and slugs are auto-generated from
-the name. `inCategory()` / `withTag()` match a slug along the locale chain (current locale,
-fallback, then any locale), so a link shared from another language still filters.
+the name. `inCategory()` / `withTag()` match a `Category`/`Tag` instance by its key. A slug
+string resolves to the one category/tag it names along the locale chain — the current locale's
+match first, then the fallback locale's, then any locale's — so a link shared from another
+language still filters, but never pulls in a different category that uses the same slug in
+another locale.
 
 ### SEO meta and structured data
 

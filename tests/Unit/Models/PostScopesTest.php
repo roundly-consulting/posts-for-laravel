@@ -98,3 +98,62 @@ it('counts posts by tag on any engine', function (): void {
     expect(Post::query()->withTag('eloquent')->count())->toBe(2)
         ->and(Post::query()->withTag('missing')->count())->toBe(0);
 });
+
+it('filters by the given category, not by others sharing its slug in another locale', function (): void {
+    // `news` is the English slug of one category and the Slovak slug of another: per-locale
+    // uniqueness allows it, so an instance must be matched by its key, never by its slug.
+    $news = Category::factory()->create(['name' => ['en' => 'News']]);
+    $slovak = Category::factory()->create(['name' => ['sk' => 'News']]);
+    $ours = Post::factory()->create();
+    $ours->categories()->attach($news);
+    Post::factory()->create()->categories()->attach($slovak);
+
+    expect(Post::query()->inCategory($news)->pluck('id')->all())->toBe([$ours->getKey()]);
+
+    app()->setLocale('sk');
+
+    expect(Post::query()->inCategory($news)->pluck('id')->all())->toBe([$ours->getKey()]);
+});
+
+it('filters by a given tag that has no slug', function (): void {
+    // A name that slugifies to nothing is skipped, so the tag has no slug to match on.
+    $tag = Tag::factory()->create(['name' => ['en' => '###']]);
+    $post = Post::factory()->create();
+    $post->tags()->attach($tag);
+    Post::factory()->create();
+
+    expect($tag->slugMap())->toBe([])
+        ->and(Post::query()->withTag($tag)->pluck('id')->all())->toBe([$post->getKey()]);
+});
+
+it('resolves a category slug to the current locale match before rescuing another locale', function (): void {
+    $news = Category::factory()->create(['name' => ['en' => 'News']]);
+    $slovak = Category::factory()->create(['name' => ['sk' => 'News']]);
+    $english = Post::factory()->create();
+    $english->categories()->attach($news);
+    $inSlovak = Post::factory()->create();
+    $inSlovak->categories()->attach($slovak);
+
+    expect(Post::query()->inCategory('news')->pluck('id')->all())->toBe([$english->getKey()]);
+
+    app()->setLocale('sk');
+
+    expect(Post::query()->inCategory('news')->pluck('id')->all())->toBe([$inSlovak->getKey()])
+        ->and(Post::query()->inCategory('news')->count())->toBe(1);
+});
+
+it('resolves a tag slug to the current locale match before rescuing another locale', function (): void {
+    $english = Tag::factory()->create(['name' => ['en' => 'Travel']]);
+    $slovak = Tag::factory()->create(['name' => ['sk' => 'Travel']]);
+    $first = Post::factory()->create();
+    $first->tags()->attach($english);
+    $second = Post::factory()->create();
+    $second->tags()->attach($slovak);
+
+    expect(Post::query()->withTag('travel')->pluck('id')->all())->toBe([$first->getKey()]);
+
+    app()->setLocale('sk');
+
+    expect(Post::query()->withTag('travel')->pluck('id')->all())->toBe([$second->getKey()])
+        ->and(Post::query()->withTag('travel')->count())->toBe(1);
+});
