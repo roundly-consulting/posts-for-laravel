@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 use RoundlyConsulting\MediaLibrary\Facades\Media;
 use RoundlyConsulting\Posts\Models\Post;
 
@@ -129,3 +130,18 @@ it('leaves malformed tokens untouched', function (): void {
 
     expect((string) $post->renderContent())->toBe('keep [media:not-a-uuid] this');
 });
+
+it('returns the stored body as raw HTML, verbatim — it never sanitizes', function (bool $inline): void {
+    // Documented contract: renderContent() is raw authored HTML. Hosts sanitize untrusted rich
+    // text at write time; the package neither strips nor escapes markup on render.
+    config()->set('posts.media.inline.enabled', $inline);
+
+    $body = '<p onclick="x()">Hi &amp; <script>alert(1)</script><a href="javascript:y()">z</a></p>';
+    $post = Post::factory()->create();
+    $post->setTranslation('content', 'en', $body)->save();
+
+    $html = $post->fresh()?->renderContent();
+
+    expect($html)->toBeInstanceOf(HtmlString::class)
+        ->and((string) $html)->toBe($body);
+})->with(['inline media on' => true, 'inline media off' => false]);

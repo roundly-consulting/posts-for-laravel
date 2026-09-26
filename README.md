@@ -479,6 +479,13 @@ $post->setTranslation('content', 'en', "Intro [media:{$image->uuid}] outro")->sa
 {!! $post->renderContent('sk') !!}    // a specific locale
 ```
 
+> **Security — `renderContent()` returns raw, unescaped HTML.** The stored body is authored HTML
+> and comes back verbatim (only the `[media:…]` tokens are replaced, with escaped values), as an
+> `HtmlString` that Blade does not escape. Echo it with `{!! !!}` **only** when the body is trusted
+> (written by trusted editors) or was sanitized when it was saved. If you accept rich text from
+> untrusted users, sanitize it **at write time** with an allow-list HTML sanitizer of your choice —
+> this package never sanitizes, neither on save nor on render.
+
 **SEO fallback.** When a post has no explicit `og:image`, `seo()->ogImage` and the JSON-LD `image`
 fall back to the featured image URL (toggle with `posts.media.seo_og_image`).
 

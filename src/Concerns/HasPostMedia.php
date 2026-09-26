@@ -91,6 +91,13 @@ trait HasPostMedia
      * Render the post body for a locale, expanding inline `[media:UUID]` / `[media:UUID|variant]`
      * tokens into responsive images / links from the post's own content bucket.
      *
+     * SECURITY — the result is RAW, UNESCAPED HTML. The stored body is authored HTML and is
+     * returned verbatim (only the media tokens are replaced, with escaped values), wrapped in an
+     * `HtmlString` so Blade will not escape it. Echo it with `{!! !!}` ONLY when the stored body
+     * is trusted (written by trusted editors) or was sanitized when it was saved. A host that
+     * accepts rich text from untrusted users MUST sanitize it at write time with an allow-list
+     * HTML sanitizer of its choice; this package never sanitizes, on write or on render.
+     *
      * Resolution is a single batched query over the referenced UUIDs and never throws on a
      * missing/unauthorized UUID (it is stripped or kept per `posts.media.inline.on_missing`).
      */
