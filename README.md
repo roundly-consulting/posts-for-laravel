@@ -45,9 +45,14 @@ service providers auto-discover, so there is nothing extra to register):
   [`approvals-for-laravel`](https://github.com/roundly-consulting/approvals-for-laravel), which
   arrives transitively). Upheld reports / threshold crossings can auto-unpublish a post. See
   **Reports & moderation**.
+- [`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel) — `Post`,
+  `Category` and `Tag` are `Sluggable`: per-locale slugs with bounded collision probing that global
+  scopes and soft deletes can't hide, per-locale unique indexes with race retry, locale-aware route
+  binding, optional slug history with 301s, a lock for published URLs, validation rules and
+  backfill commands. See **Slugs**.
 
-All four sit in a strictly lower dependency tier than posts (enums T0 · media/likes/approvals T1 ·
-reports T2 · posts T3), so the dependency graph stays acyclic.
+All of them sit in a strictly lower dependency tier than posts (enums/sluggable T0 ·
+media/likes/approvals T1 · reports T2 · posts T3), so the dependency graph stays acyclic.
 
 ## Installation
 
@@ -70,8 +75,18 @@ php artisan vendor:publish --tag="likes-migrations"
 php artisan vendor:publish --tag="reports-migrations"
 php artisan vendor:publish --tag="approvals-migrations"
 
+# Only if you turn on slug history (posts.slugs.history):
+php artisan vendor:publish --tag="sluggable-migrations"
+
 php artisan migrate
 ```
+
+> **Slug indexes are built for the locales known at migrate time.** The posts, categories and
+> tags migrations add one unique index per supported locale on `slug`. The locale list comes
+> from sluggable (`sluggable.locales.supported`, or translatable-for-laravel's locales when it is
+> installed, else `app.locale` + `app.fallback_locale`) — set it **before** `migrate`. Add
+> locales later with `php artisan sluggable:indexes "RoundlyConsulting\Posts\Models\Post"` (and
+> the same for `Category` and `Tag`).
 
 Optionally publish the config and views:
 
@@ -85,8 +100,8 @@ php artisan vendor:publish --tag="posts-views"
 > them **before** running `migrate`; an unrecognized value falls back to `bigint`, and changing
 > either later is a data migration. See [Key types](#key-types).
 
-> **PostgreSQL:** translatable columns ship as `json`. If you want indexed JSON queries, change
-> them to `jsonb` in the published migration before migrating.
+> **PostgreSQL:** translatable columns ship as `jsonb`; the slug indexes are expression indexes
+> on `slug->>'<locale>'`, so slug lookups and route binding use them.
 
 ## Configuration
 
@@ -107,8 +122,10 @@ The published `config/posts.php`:
 | `locales.fallback` | string | `app.fallback_locale` | `POSTS_FALLBACK_LOCALE` | Fallback locale for translations/route binding. |
 | `slugs.source` | string | `title` | — | Attribute slugs are generated from. |
 | `slugs.separator` | string | `-` | — | Slug word separator. |
-| `slugs.unique` | bool | `true` | — | Suffix colliding slugs (`-2`, `-3`, …). |
-| `slugs.route-binding` | bool | `true` | — | Bind `{post:slug}` by the translated slug. |
+| `slugs.unique` | bool | `true` | — | Suffix colliding slugs per locale (`-2`, `-3`, …), trashed rows included; at migrate time, also builds the per-locale unique indexes. |
+| `slugs.route-binding` | bool | `true` | — | Make the slug the post's route key: `{post}` binds by the translated slug and `route(…, $post)` emits it. |
+| `slugs.history` | bool | `false` | `POSTS_SLUG_HISTORY` | Remember retired post slugs and 301 old URLs to the current one (needs sluggable's migration). |
+| `slugs.lock-when-published` | bool | `false` | — | Freeze a published post's slugs: no regeneration, and a manual change throws `SlugLockedException`. |
 | `seo.site-name` | ?string | `null` | `POSTS_SITE_NAME` | Default `og:site_name` (a post can override it). |
 | `seo.twitter-site` | ?string | `null` | `POSTS_TWITTER_SITE` | Default `twitter:site` handle. |
 | `seo.default-card` | string | `summary_large_image` | — | Default Twitter card type. |
@@ -188,8 +205,8 @@ final class User extends Authenticatable
 
 Create a post with translated content. Each translatable attribute (`title`, `slug`, `perex`,
 `content`, `meta_title`, `meta_description`) is stored as a JSON map of locale => value.
-Slugs are generated per locale from the title, de-duplicated automatically, and a manually set
-slug is preserved:
+Slugs are generated per locale from the title and de-duplicated automatically; a manually set
+slug is normalised (`Custom Slug` → `custom-slug`) and kept unique (see [Slugs](#slugs)):
 
 ```php
 use RoundlyConsulting\Posts\Models\Post;
@@ -276,7 +293,8 @@ $guides->descendants();   // [Laravel, …]
 ```
 
 Category and tag `name` and `slug` are both translatable, and slugs are auto-generated from
-the name.
+the name. `inCategory()` / `withTag()` match a slug along the locale chain (current locale,
+fallback, then any locale), so a link shared from another language still filters.
 
 ### SEO meta and structured data
 
@@ -303,14 +321,63 @@ $post->seo();        // SeoData with merged config defaults + fallbacks
 $post->toJsonLd();   // array<string, mixed>
 ```
 
-### Route-model binding by translated slug
+### Slugs
 
-With `posts.slugs.route-binding` enabled, `{post:slug}` resolves by the current locale's slug,
-falling back to the configured fallback locale:
+Posts, categories and tags get their slugs from
+[`sluggable-for-laravel`](https://github.com/roundly-consulting/sluggable-for-laravel). Each keeps a
+per-locale `slug` map:
+
+- **Generated** from the title (posts, `posts.slugs.source`) or the name (categories, tags) for
+  every locale that has one. A blank title, or one that slugifies to nothing, is skipped.
+- **Filled, not rewritten**: a save that changes the model fills locales that have no slug yet;
+  existing slugs stay put, so a title edit never breaks a URL. A no-op `save()` changes nothing —
+  backfill with `php artisan sluggable:regenerate "RoundlyConsulting\Posts\Models\Post" --mode=missing`.
+- **Unique per locale** (`posts.slugs.unique`): collisions get `-2`, `-3`, … in bounded, batched
+  probes. Trashed rows and rows hidden by global scopes count as taken, and the per-locale unique
+  indexes plus an automatic retry close the race between two concurrent saves.
+- **Manual slugs** are normalised and made unique (`Custom Slug` → `custom-slug`, `taken` →
+  `taken-2`), including the ones `CreatePostAction` receives.
 
 ```php
-Route::get('/posts/{post:slug}', fn (Post $post) => view('posts.show', compact('post')));
+$post->currentSlug();        // current locale → posts.locales.fallback → any locale
+$post->slugFor('sk');        // exactly one locale, no fallback
+$post->slugMap();            // ['en' => 'hello-world', 'sk' => 'ahoj-svet']
+
+// Swappable model: query through the seam, not Post::findBySlug() (which is always the packaged class)
+use RoundlyConsulting\Posts\Support\PostModel;
+
+PostModel::query()->whereSlug('hello-world')->first();
 ```
+
+**Route binding.** With `posts.slugs.route-binding` on (default), the slug is the post's route
+key. `{post}` and `{post:slug}` bind by the current locale's slug, then the fallback locale, then
+any locale, and `route('posts.show', $post)` generates the current-locale slug, so URLs and
+binding always agree. A numeric slug is never shadowed by a post id.
+
+```php
+Route::get('/posts/{post}', fn (Post $post) => view('posts.show', compact('post')))->name('posts.show');
+```
+
+**URL safety.** Turn on `posts.slugs.history` (and publish `sluggable-migrations`) to remember
+retired post slugs: a request for an old slug answers `301` to the current URL, query string kept.
+On uuid/ulid posts (`posts.primary_key_type`), set `sluggable.key_type` to the same value before
+migrating the history table.
+Turn on `posts.slugs.lock-when-published` to freeze a post's slugs once it is published: no
+automatic change, and a manual change throws `SlugLockedException`.
+
+**Validation.** `Post::slugRules()` returns rules for a host form that accepts a slug map, using
+the same uniqueness check as generation; pass the post being edited to ignore it:
+
+```php
+$request->validate([...Post::slugRules($post), 'title' => ['required', 'array']]);
+```
+
+Admins who should see a validation error instead of a silent `-2` can combine these rules with
+sluggable's `Strict` manual policy in their own model subclass.
+
+**Existing data.** The old slug check ignored trashed posts, so a live and a trashed post may
+share a slug. Run `php artisan sluggable:duplicates "RoundlyConsulting\Posts\Models\Post"` (and
+`Category`/`Tag`) before migrating the indexes onto existing data.
 
 ### Actions (DTO entry points)
 
