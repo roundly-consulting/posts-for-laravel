@@ -28,3 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 
 - The private `HasSluggableTranslations` trait and the custom `Post::resolveRouteBinding()`.
+
+### Security
+
+- `renderJsonLd()` hex-escapes `<`, `>`, `&`, `'` and `"` inside the JSON-LD, so a title, perex,
+  author, tag or category name containing `</script>` can no longer break out of the
+  `<script type="application/ld+json">` element (stored XSS). If you published `posts-views`,
+  re-publish `json-ld.blade.php` (or apply the same `JSON_HEX_*` flags to your copy).

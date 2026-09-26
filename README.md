@@ -320,6 +320,7 @@ $post->save();
 // In a Blade layout:
 {!! $post->renderMetaTags() !!}   // <title>, description, canonical, og:*, twitter:*, robots
 {!! $post->renderJsonLd() !!}     // <script type="application/ld+json"> BlogPosting/Article
+                                  // (values hex-escaped: a stored `</script>` cannot break out)
 
 $post->seo();        // SeoData with merged config defaults + fallbacks
 $post->toJsonLd();   // array<string, mixed>
