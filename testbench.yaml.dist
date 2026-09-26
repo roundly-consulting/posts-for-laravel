@@ -1,0 +1,7 @@
+# Registers the package's own provider in every Testbench-booted app, including the one
+# Larastan boots. Testbench only adds the root package to its discovery manifest when the
+# manifest is built from its CLI; a manifest rebuilt anywhere else (Larastan's first boot on
+# a fresh CI checkout) drops it, and the `posts::` views then look missing to the
+# view-string check.
+providers:
+  - RoundlyConsulting\Posts\PostsServiceProvider
