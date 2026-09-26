@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   indexes built by the create migrations, and retry on a racing insert.
 - Route binding follows the locale chain current → fallback → any locale, and the slug is now the
   post's route key, so `route(…, $post)` emits the slug the binder resolves.
-- `inCategory()` / `withTag()` match an instance by its key, and a slug by the one category/tag
-  it resolves to along the same locale chain (current locale's match first).
+- `inCategory()` / `withTag()` match an instance by its key, and a slug at its best locale along
+  the same chain (current locale's matches first), never unioned across locales.
 - Manual slugs (including `CreatePostAction`) are normalised and made unique.
 - A no-op `save()` no longer back-fills missing slug locales; use `sluggable:regenerate --mode=missing`.
 

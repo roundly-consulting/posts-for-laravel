@@ -34,3 +34,26 @@ it('lets categories and tags share a slug when disabled', function (): void {
     expect(Category::factory()->create(['name' => ['en' => 'News']])->getTranslation('slug', 'en'))->toBe('news')
         ->and(Tag::factory()->create(['name' => ['en' => 'News']])->getTranslation('slug', 'en'))->toBe('news');
 });
+
+it('filters by every category and tag that shares the slug when disabled', function (): void {
+    // Without uniqueness two categories may both be `news` in the current locale; a slug filter
+    // must keep all of them, and still ignore a third that is `news` only in another locale.
+    $first = Category::factory()->create(['name' => ['en' => 'News']]);
+    $second = Category::factory()->create(['name' => ['en' => 'News']]);
+    $slovak = Category::factory()->create(['name' => ['sk' => 'News']]);
+    $tagged = Tag::factory()->create(['name' => ['en' => 'News']]);
+    $alsoTagged = Tag::factory()->create(['name' => ['en' => 'News']]);
+
+    $posts = collect([$first, $second, $slovak])->map(function (Category $category): Post {
+        $post = Post::factory()->create();
+        $post->categories()->attach($category);
+
+        return $post;
+    });
+
+    $posts[0]->tags()->attach($tagged);
+    $posts[1]->tags()->attach($alsoTagged);
+
+    expect(Post::query()->inCategory('news')->orderBy('id')->pluck('id')->all())->toBe([$posts[0]->getKey(), $posts[1]->getKey()])
+        ->and(Post::query()->withTag('news')->count())->toBe(2);
+});

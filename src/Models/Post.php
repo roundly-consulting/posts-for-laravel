@@ -36,6 +36,7 @@ use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Reports\Contracts\Reportable;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
+use RoundlyConsulting\Sluggable\Contracts\SlugLocales;
 use RoundlyConsulting\Sluggable\Definitions\SlugOptions;
 use RoundlyConsulting\Sluggable\Rules\UniqueSlug;
 
@@ -172,35 +173,31 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     }
 
     /**
-     * Posts in a category. An instance matches by its key; a slug matches the ONE category it
-     * resolves to along sluggable's locale chain — the current locale's match, else the
-     * fallback's, else any locale's (the row `{category}` binding would pick) — never every
-     * category that uses the same slug in some other locale.
+     * Posts in a category. An instance matches by its key. A slug matches the categories it
+     * names at its best locale along sluggable's chain — the current locale's matches, else the
+     * fallback's, else the next locale's (the level `{category}` binding prefers) — never a
+     * category that only uses the same slug in a later locale of the chain.
      *
      * @param  Builder<Post>  $query
      */
     public function scopeInCategory(Builder $query, Category|string $category): void
     {
-        $match = $category instanceof Category
-            ? $category->getKey()
-            : Category::query()->whereSlug($category)->orderBySlugPreference($category)->limit(1)->select((new Category)->getQualifiedKeyName());
-
-        $query->whereHas('categories', static fn (Builder $query): Builder => self::whereTaxonomyKey($query, $match));
+        $query->whereHas('categories', static fn (Builder $query): Builder => $category instanceof Category
+            ? $query->whereKey($category->getKey())
+            : self::whereBestSlugMatch($query, Category::query(), $category));
     }
 
     /**
-     * Posts carrying a tag — an instance by its key, a slug by the one tag it resolves to along
-     * the locale chain (see {@see scopeInCategory()}).
+     * Posts carrying a tag — an instance by its key, a slug by the tags it names at its best
+     * locale along the chain (see {@see scopeInCategory()}).
      *
      * @param  Builder<Post>  $query
      */
     public function scopeWithTag(Builder $query, Tag|string $tag): void
     {
-        $match = $tag instanceof Tag
-            ? $tag->getKey()
-            : Tag::query()->whereSlug($tag)->orderBySlugPreference($tag)->limit(1)->select((new Tag)->getQualifiedKeyName());
-
-        $query->whereHas('tags', static fn (Builder $query): Builder => self::whereTaxonomyKey($query, $match));
+        $query->whereHas('tags', static fn (Builder $query): Builder => $tag instanceof Tag
+            ? $query->whereKey($tag->getKey())
+            : self::whereBestSlugMatch($query, Tag::query(), $tag));
     }
 
     public function publish(?CarbonInterface $at = null): self
@@ -367,20 +364,41 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     }
 
     /**
-     * Constrain a category/tag query to one key, or to the key a scalar subquery selects (a
-     * subquery is compared with `=`, never cast to a string key).
+     * Constrain a category/tag query to the rows a slug names at the first locale of the slug
+     * chain that has any match: level N is "matches in locale N and in no earlier locale", so a
+     * row that shares the slug in a later locale never widens an earlier match, while every row
+     * of the winning level is kept (several, when `posts.slugs.unique` is off). Predicates only —
+     * no ORDER BY, so counts over the `whereHas` stay valid SQL on every engine.
      *
      * @template TModel of Model
      *
      * @param  Builder<TModel>  $query
-     * @param  Builder<covariant Model>|int|string|null  $key
+     * @param  Builder<Category>|Builder<Tag>  $taxonomy  a fresh query on the same model
      * @return Builder<TModel>
      */
-    private static function whereTaxonomyKey(Builder $query, Builder|int|string|null $key): Builder
+    private static function whereBestSlugMatch(Builder $query, Builder $taxonomy, string $slug): Builder
     {
-        return $key instanceof Builder
-            ? $query->where($query->getModel()->getQualifiedKeyName(), '=', $key)
-            : $query->whereKey($key);
+        $model = $taxonomy->getModel();
+        $key = $query->getModel()->getQualifiedKeyName();
+        $locales = $model->slugDefinition()->chain(app(SlugLocales::class));
+
+        return $query->where(static function (Builder $query) use ($taxonomy, $model, $key, $locales, $slug): void {
+            $earlier = [];
+
+            foreach ($locales as $locale) {
+                $level = (clone $taxonomy)->whereSlug($slug, locale: $locale);
+
+                $query->orWhere(static function (Builder $query) use ($model, $key, $level, $earlier): void {
+                    $query->whereIn($key, (clone $level)->select($model->getQualifiedKeyName()));
+
+                    foreach ($earlier as $previous) {
+                        $query->whereNotExists($previous->toBase());
+                    }
+                });
+
+                $earlier[] = $level;
+            }
+        });
     }
 
     protected static function newFactory(): PostFactory
