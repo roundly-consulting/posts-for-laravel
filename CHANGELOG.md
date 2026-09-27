@@ -1,37 +1,28 @@
 # Changelog
 
-All notable changes to `posts-for-laravel` will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+All notable changes to `posts-for-laravel` are documented in this file. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/).
 
 ## Unreleased
 
-### Changed
-
-- Slugs for posts, categories and tags now run on `sluggable-for-laravel` (hard dependency):
-  bounded collision probing that trashed and globally-scoped rows can't hide, per-locale unique
-  indexes built by the create migrations, and retry on a racing insert.
-- Route binding follows the locale chain current → fallback → any locale, and the slug is now the
-  post's route key, so `route(…, $post)` emits the slug the binder resolves.
-- `inCategory()` / `withTag()` match an instance by its key, and a slug at its best locale along
-  the same chain (current locale's matches first), never unioned across locales.
-- Manual slugs (including `CreatePostAction`) are normalised and made unique.
-- A no-op `save()` no longer back-fills missing slug locales; use `sluggable:regenerate --mode=missing`.
+Initial public release.
 
 ### Added
 
-- `posts.slugs.history` (slug history + 301 redirects) and `posts.slugs.lock-when-published`.
-- `Post::slugRules()` for host form requests.
-- `Slug history` and `Slug lock` lines in `php artisan about`.
-
-### Removed
-
-- The private `HasSluggableTranslations` trait and the custom `Post::resolveRouteBinding()`.
-
-### Security
-
-- `renderJsonLd()` hex-escapes `<`, `>`, `&`, `'` and `"` inside the JSON-LD, so a title, perex,
-  author, tag or category name containing `</script>` can no longer break out of the
-  `<script type="application/ld+json">` element (stored XSS). If you published `posts-views`,
-  re-publish `json-ld.blade.php` (or apply the same `JSON_HEX_*` flags to your copy).
+- A multilingual blog / posts engine: translatable title, slug, perex, content and SEO fields,
+  with a polymorphic author via the `HasPosts` trait (bigint, UUID or ULID keys).
+- A publishing lifecycle (`PostStatus`: draft, scheduled, published, archived) with
+  `publish()`-style transitions, query scopes and the `posts:publish-scheduled` command.
+- Nested categories and tags with translatable names and slugs, plus `inCategory()` and
+  `withTag()` scopes.
+- Per-post SEO meta with fallbacks — `setSeo()`, `renderMetaTags()` (title, description,
+  canonical, Open Graph, Twitter, robots) and schema.org JSON-LD via `renderJsonLd()`.
+- Per-locale slugs built on sluggable-for-laravel: unique per locale, locale-aware route binding,
+  optional slug history with 301 redirects, a lock for published URLs and `Post::slugRules()`.
+- `CreatePostAction`, `PublishPostAction` and `UpdatePostSeoAction`, and the `PostPublished`,
+  `PostScheduled`, `PostArchived` and `PostDrafted` events.
+- Featured image, gallery and inline `[media:UUID]` content tokens through media-library-for-laravel.
+- Likes and reactions on posts through likes-for-laravel, with popular and trending feed scopes.
+- Post reports and moderation through reports-for-laravel, with optional auto-unpublish when a
+  report is upheld or a threshold is crossed.
