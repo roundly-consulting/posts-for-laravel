@@ -390,10 +390,6 @@ $request->validate([...Post::slugRules($post), 'title' => ['required', 'array']]
 Admins who should see a validation error instead of a silent `-2` can combine these rules with
 sluggable's `Strict` manual policy in their own model subclass.
 
-**Existing data.** The old slug check ignored trashed posts, so a live and a trashed post may
-share a slug. Run `php artisan sluggable:duplicates "RoundlyConsulting\Posts\Models\Post"` (and
-`Category`/`Tag`) before migrating the indexes onto existing data.
-
 ### Actions (DTO entry points)
 
 ```php
@@ -612,13 +608,6 @@ non-post report subject:
 ```
 
 Set both to `null` / `false` to disable auto-moderation entirely and drive visibility yourself.
-
-## Migrating from the previous version (pre-release)
-
-This unreleased version replaces the old `visible` boolean and single `content` column. For any
-early adopter: `visible = true → status = published, published_at = now`;
-`visible = false → status = draft`; move the old `content` into the `content` JSON translation
-for your default locale. The `author-model` config is gone — authorship is now polymorphic.
 
 ## Testing
 

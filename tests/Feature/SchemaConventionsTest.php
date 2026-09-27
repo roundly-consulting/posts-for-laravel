@@ -75,10 +75,6 @@ it('falls back to bigint for an unrecognized key type instead of throwing', func
     expect(probeSchema('bogus'))->toContain('"author_id" integer,');
 });
 
-it('accepts the legacy id alias for bigint', function (): void {
-    expect(probeSchema('id'))->toContain('"author_id" integer,');
-});
-
 it('emits a required morph pair when the author is not nullable', function (): void {
     expect(probeSchema('bigint', nullable: false))
         ->toContain('"author_type" varchar not null')
