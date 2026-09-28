@@ -22,6 +22,8 @@ use RoundlyConsulting\Sluggable\Schema\SlugIndexes;
  * Uniqueness, trashed visibility and per-locale scope are pinned here rather than left to
  * `sluggable.defaults.*`: the migrations build indexes of this exact shape, and a host
  * default drifting away from them would make the definition and the index disagree.
+ *
+ * @internal
  */
 final class PostSlugs
 {

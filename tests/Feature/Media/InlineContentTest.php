@@ -6,7 +6,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
-use RoundlyConsulting\MediaLibrary\Facades\Media;
+use RoundlyConsulting\MediaLibrary\Facades\MediaLibrary;
 use RoundlyConsulting\Posts\Models\Post;
 
 beforeEach(function (): void {
@@ -81,7 +81,7 @@ it('strips a token whose uuid is not owned by the post', function (): void {
     $post = Post::factory()->create();
 
     // Global media (not in the post's content bucket) must never resolve inline.
-    $global = Media::add(UploadedFile::fake()->image('global.jpg', 400, 300))->toBucket('content');
+    $global = MediaLibrary::add(UploadedFile::fake()->image('global.jpg', 400, 300))->toBucket('content');
 
     $post->setTranslation('content', 'en', "a [media:{$global->uuid}] b")->save();
 

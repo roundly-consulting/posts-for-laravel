@@ -168,7 +168,10 @@
         "laravel": {
             "providers": [
                 "RoundlyConsulting\\Posts\\PostsServiceProvider"
-            ]
+            ],
+            "aliases": {
+                "Posts": "RoundlyConsulting\\Posts\\Facades\\Posts"
+            }
         }
     },
     "minimum-stability": "dev",

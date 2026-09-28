@@ -9,6 +9,8 @@ use RoundlyConsulting\Posts\Models\Post;
 
 /**
  * Builds a schema.org BlogPosting/Article structured-data array for a post.
+ *
+ * @internal
  */
 final class JsonLdBuilder
 {

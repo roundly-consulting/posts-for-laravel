@@ -16,7 +16,9 @@ use RoundlyConsulting\Reports\Events\ReportThresholdReached;
  *
  * When a report against a post is upheld (`ReportResolved`) or a post crosses the
  * open-report threshold (`ReportThresholdReached`), the post is auto-unpublished
- * through its own lifecycle (re-emitting `PostArchived`/`PostDrafted`). Because
+ * through its own lifecycle (re-emitting `PostArchived`/`PostDrafted`) — the model's
+ * `archive()`/`unpublish()`, which route through the posts manager, so a host override
+ * runs and `Posts::fake()` records it. Because
  * reports is polymorphic and shared, every subject is guarded against the
  * configured post model before acting; non-post subjects are ignored.
  *
@@ -64,7 +66,7 @@ final class SyncPostVisibilityFromReports
         }
 
         match ($action) {
-            'draft' => $post->draft(),
+            'draft' => $post->unpublish(),
             'archive' => $post->archive(),
             default => null,
         };

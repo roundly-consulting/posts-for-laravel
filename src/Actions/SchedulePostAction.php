@@ -6,26 +6,27 @@ namespace RoundlyConsulting\Posts\Actions;
 
 use Carbon\CarbonInterface;
 use RoundlyConsulting\Posts\Enums\PostStatus;
-use RoundlyConsulting\Posts\Events\PostPublished;
+use RoundlyConsulting\Posts\Events\PostScheduled;
 use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
 use RoundlyConsulting\Posts\Models\Post;
 
-final readonly class PublishPostAction
+final readonly class SchedulePostAction
 {
     public function __construct(
         private TransitionPostAction $transition,
     ) {}
 
     /**
-     * Publish the post at `$at` (now when omitted) and dispatch {@see PostPublished}.
+     * Schedule the post for `$at` and dispatch {@see PostScheduled}. `posts:publish-scheduled`
+     * (or `Posts::publishDue()`) publishes it once that time has passed.
      *
      * @throws InvalidPostStatusTransitionException when the post is archived
      */
-    public function execute(Post $post, ?CarbonInterface $at = null): Post
+    public function execute(Post $post, CarbonInterface $at): Post
     {
-        $this->transition->execute($post, PostStatus::Published, $at ?? now());
+        $this->transition->execute($post, PostStatus::Scheduled, $at);
 
-        PostPublished::dispatch($post->id);
+        PostScheduled::dispatch($post->id);
 
         return $post;
     }

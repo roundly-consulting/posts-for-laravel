@@ -18,6 +18,10 @@ use RoundlyConsulting\Posts\Models\Post;
  * `Post` falls back to the packaged model — the tolerance the listeners already
  * had — while a value that is not a model at all throws the toolkit's
  * `InvalidConfigurationException`.
+ *
+ * Hosts query through `Posts::query()` / `Posts::findBySlug()` instead.
+ *
+ * @internal
  */
 final class PostModel
 {

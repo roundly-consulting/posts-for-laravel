@@ -14,6 +14,8 @@ use RoundlyConsulting\MediaLibrary\Models\Media;
  * The renderer never resolves media itself: the caller passes the already-fetched candidate
  * media (the post's own content bucket), so resolution stays a single batched query and inline
  * media can only ever point at media the post owns — never an arbitrary global UUID.
+ *
+ * @internal
  */
 final class ContentMediaRenderer
 {

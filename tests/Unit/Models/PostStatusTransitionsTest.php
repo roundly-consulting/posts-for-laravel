@@ -53,7 +53,7 @@ it('returns an archived post to draft and clears published_at', function (): voi
     $post = Post::factory()->published()->create();
     $post->archive();
 
-    $post->draft();
+    $post->unpublish();
 
     expect($post->status)->toBe(PostStatus::Draft)
         ->and($post->published_at)->toBeNull();
@@ -73,7 +73,7 @@ it('dispatches an event for each transition', function (): void {
 
     $post->publish();
     $post->schedule(now()->addDay());
-    $post->draft();
+    $post->unpublish();
     $post->archive();
 
     Event::assertDispatched(PostPublished::class);

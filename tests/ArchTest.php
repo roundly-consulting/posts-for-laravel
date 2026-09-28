@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use RoundlyConsulting\Posts\Exceptions\PostsException;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\PostsManager;
 use RoundlyConsulting\Testing\Arch\ArchPresets;
 
 /**
@@ -15,8 +16,9 @@ ArchPresets::strictTypes('RoundlyConsulting\Posts');
 
 /**
  * The deliberate extension points are exempt: `Post` is what `posts.model` invites a host to
- * subclass (pinned by the preset below instead), and PostsException is the base every posts
- * error extends so a host can catch them uniformly.
+ * subclass (pinned by the preset below instead), PostsException is the base every posts
+ * error extends so a host can catch them uniformly, and PostsManager is what `Posts::fake()`
+ * extends so a constructor-injected manager still type-checks under the fake.
  *
  * Note the `$ignoring` PARAMETER rather than Pest's fluent `->ignoring()`. Only the parameter
  * is rot-checked (it registers `exemptionsExist` automatically): the fluent form accepts any
@@ -26,6 +28,7 @@ ArchPresets::strictTypes('RoundlyConsulting\Posts');
 ArchPresets::finalByDefault('RoundlyConsulting\Posts', [
     Post::class,
     PostsException::class,
+    PostsManager::class,
 ]);
 
 /**
@@ -77,3 +80,9 @@ ArchPresets::morphColumnsUseTheSeam(__DIR__.'/../database/migrations');
 ArchPresets::runtimeRequireIsWhitelisted(__DIR__.'/../composer.json');
 
 ArchPresets::noDebuggingLeftovers();
+
+/**
+ * One path: the model's lifecycle methods and `syncTags()`, and every Concerns trait, go
+ * through PostsManager — never straight to an action — so `Posts::fake()` sees every call.
+ */
+ArchPresets::modelsGoThroughTheFacade('RoundlyConsulting\Posts');

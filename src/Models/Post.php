@@ -25,11 +25,7 @@ use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\PostFactory;
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
 use RoundlyConsulting\Posts\Enums\PostStatus;
-use RoundlyConsulting\Posts\Events\PostArchived;
-use RoundlyConsulting\Posts\Events\PostDrafted;
-use RoundlyConsulting\Posts\Events\PostPublished;
-use RoundlyConsulting\Posts\Events\PostScheduled;
-use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
+use RoundlyConsulting\Posts\PostsManager;
 use RoundlyConsulting\Posts\Support\JsonLdBuilder;
 use RoundlyConsulting\Posts\Support\PostModel;
 use RoundlyConsulting\Posts\Support\PostSlugs;
@@ -200,72 +196,56 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
             : self::whereBestSlugMatch($query, Tag::query(), $tag));
     }
 
+    /**
+     * Publish the post at `$at` (now when omitted). Routes through {@see PostsManager::publish()},
+     * so a faked manager records it; override it in a `posts.model` subclass to hook in.
+     */
     public function publish(?CarbonInterface $at = null): self
     {
-        $this->transitionTo(PostStatus::Published, $at ?? now());
-
-        PostPublished::dispatch($this->id);
-
-        return $this;
-    }
-
-    public function schedule(CarbonInterface $at): self
-    {
-        $this->transitionTo(PostStatus::Scheduled, $at);
-
-        PostScheduled::dispatch($this->id);
-
-        return $this;
-    }
-
-    public function archive(): self
-    {
-        $this->transitionTo(PostStatus::Archived, $this->published_at);
-
-        PostArchived::dispatch($this->id);
-
-        return $this;
-    }
-
-    public function draft(): self
-    {
-        $this->transitionTo(PostStatus::Draft, null);
-
-        PostDrafted::dispatch($this->id);
+        app(PostsManager::class)->publish($this, $at);
 
         return $this;
     }
 
     /**
-     * Find-or-create tags by their translated name in the current locale and
-     * sync them onto the post.
+     * Schedule the post to go live at `$at` — {@see PostsManager::schedule()}.
+     */
+    public function schedule(CarbonInterface $at): self
+    {
+        app(PostsManager::class)->schedule($this, $at);
+
+        return $this;
+    }
+
+    /**
+     * Archive the post — {@see PostsManager::archive()}.
+     */
+    public function archive(): self
+    {
+        app(PostsManager::class)->archive($this);
+
+        return $this;
+    }
+
+    /**
+     * Move the post back to draft — {@see PostsManager::unpublish()}.
+     */
+    public function unpublish(): self
+    {
+        app(PostsManager::class)->unpublish($this);
+
+        return $this;
+    }
+
+    /**
+     * Sync the post's tags: `Tag` models, or names found or created in the current locale —
+     * {@see PostsManager::syncTags()}.
      *
      * @param  iterable<int, string|Tag>  $tags
      */
     public function syncTags(iterable $tags): self
     {
-        $locale = app()->getLocale();
-        $ids = [];
-
-        foreach ($tags as $tag) {
-            if ($tag instanceof Tag) {
-                $ids[] = $tag->getKey();
-
-                continue;
-            }
-
-            $existing = Tag::query()
-                ->where(function (Builder $query) use ($locale, $tag): void {
-                    $query->getQuery()->where("name->{$locale}", $tag);
-                })
-                ->first();
-
-            $ids[] = $existing?->getKey() ?? Tag::create([
-                'name' => [$locale => $tag],
-            ])->getKey();
-        }
-
-        $this->tags()->sync($ids);
+        app(PostsManager::class)->syncTags($this, $tags);
 
         return $this;
     }
@@ -404,17 +384,6 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     protected static function newFactory(): PostFactory
     {
         return PostFactory::new();
-    }
-
-    private function transitionTo(PostStatus $status, ?CarbonInterface $publishedAt): void
-    {
-        if ($this->status === PostStatus::Archived && $status !== PostStatus::Draft && $status !== PostStatus::Archived) {
-            throw InvalidPostStatusTransitionException::between($this->status, $status);
-        }
-
-        $this->status = $status;
-        $this->published_at = $publishedAt !== null ? CarbonImmutable::instance($publishedAt) : null;
-        $this->save();
     }
 
     /** The featured image URL used as the og:image fallback, or null when unavailable/disabled. */

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use RoundlyConsulting\MediaLibrary\Jobs\GenerateVariantsJob;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Events\PostPublished;
+use RoundlyConsulting\Posts\Facades\Posts;
 use RoundlyConsulting\Posts\Listeners\WarmPostMediaVariants;
 use RoundlyConsulting\Posts\Models\Category;
 use RoundlyConsulting\Posts\Models\Tag;
@@ -106,4 +107,18 @@ it('finds host-model posts by slug through the seam', function (): void {
     expect($found)->toBeInstanceOf(CustomPost::class)
         ->and($found?->is($post))->toBeTrue()
         ->and(PostModel::query()->whereSlug('missing')->exists())->toBeFalse();
+});
+
+it('creates, finds and queries host-model posts through the facade', function (): void {
+    CustomPost::$published = 0;
+
+    $post = Posts::draft()->title('en', 'Facade Host')->publish();
+
+    // The builder publishes through the manager; the model's own publish() is the host's
+    // override point for direct calls, so it does not run here.
+    expect($post)->toBeInstanceOf(CustomPost::class)
+        ->and(Posts::findBySlug('facade-host'))->toBeInstanceOf(CustomPost::class)
+        ->and(Posts::published()->sole())->toBeInstanceOf(CustomPost::class)
+        ->and(Posts::query()->getModel())->toBeInstanceOf(CustomPost::class)
+        ->and(CustomPost::$published)->toBe(0);
 });

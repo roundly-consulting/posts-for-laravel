@@ -41,6 +41,7 @@ final class PostsServiceProvider extends PackageServiceProvider
         parent::register();
 
         $this->app->singleton(ContentMediaRenderer::class);
+        $this->app->singleton(PostsManager::class);
     }
 
     public function boot(): void

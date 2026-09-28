@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Posts\Commands;
 
 use Illuminate\Console\Command;
-use RoundlyConsulting\Posts\Enums\PostStatus;
-use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\PostsManager;
 
 final class PublishScheduledPostsCommand extends Command
 {
@@ -14,18 +13,11 @@ final class PublishScheduledPostsCommand extends Command
 
     protected $description = 'Publish scheduled posts whose publish time has arrived';
 
-    public function handle(): int
+    public function handle(PostsManager $posts): int
     {
-        $due = PostModel::query()
-            ->where('status', PostStatus::Scheduled)
-            ->where('published_at', '<=', now())
-            ->get();
+        $count = $posts->publishDue();
 
-        foreach ($due as $post) {
-            $post->publish($post->published_at);
-        }
-
-        $this->info("Published {$due->count()} scheduled post(s).");
+        $this->info("Published {$count} scheduled post(s).");
 
         return self::SUCCESS;
     }
