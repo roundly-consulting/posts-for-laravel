@@ -202,6 +202,139 @@ key to go wrong: a polymorphic column cannot carry one.)
 
 ## Usage
 
+### The `Posts` facade
+
+Everything a host does with posts goes through one facade, `RoundlyConsulting\Posts\Facades\Posts`
+(also aliased as `Posts`):
+
+```php
+use RoundlyConsulting\Posts\Facades\Posts;
+use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
+
+// Write a post with the builder, then save it as a draft, publish it or schedule it
+$post = Posts::draft()
+    ->title('en', 'Hello world')->title('sk', 'Ahoj svet')
+    ->perex('en', 'A short intro')
+    ->content('en', '<p>…</p>')
+    ->by($user)                                   // any author model, bigint/uuid/ulid keyed
+    ->tags(['laravel', 'php'])                    // Tag models, or names found/created in the current locale
+    ->seo(new SeoData(canonical: 'https://example.test/hello-world'))
+    ->publish();                                  // or ->save() (draft), ->publish($at), ->schedule($at)
+
+// Or from a DTO
+Posts::create($createPostData);
+
+// Lifecycle
+Posts::publish($post);                            // now, or Posts::publish($post, $at)
+Posts::schedule($post, now()->addDay());
+Posts::archive($post);
+Posts::unpublish($post);                          // back to draft
+Posts::publishDue();                              // publish every scheduled post whose time has come → int
+
+// SEO and tags
+Posts::seo($post, new SeoData(metaTitle: 'Custom title', robots: 'index,follow'));
+Posts::syncTags($post, ['eloquent', $tag]);
+
+// Reads — always the configured posts.model
+Posts::findBySlug('hello-world');                 // current locale → fallback → any locale
+Posts::findBySlug('ahoj-svet', 'sk');             // exactly one locale
+Posts::published()->latest('published_at')->paginate();
+Posts::query()->inCategory('laravel')->get();
+```
+
+| Method | Returns | What it does |
+|---|---|---|
+| `create(CreatePostData $data)` | `Post` | Create a post from a DTO (see below) |
+| `draft()` | `PendingPost` | Builder: `title/slug/perex/content/metaTitle/metaDescription($locale, $value)`, `by($author)`, `tags([...])`, `seo(SeoData)`, then `save()`, `publish(?$at)`, `schedule($at)` or `data()` (the DTO) |
+| `publish(Post $post, ?CarbonInterface $at = null)` | `Post` | Publish now or at `$at`; fires `PostPublished` |
+| `schedule(Post $post, CarbonInterface $at)` | `Post` | Schedule; fires `PostScheduled` |
+| `archive(Post $post)` | `Post` | Archive, keeping the publish date; fires `PostArchived` |
+| `unpublish(Post $post)` | `Post` | Back to draft, clearing the publish date; fires `PostDrafted` |
+| `seo(Post $post, SeoData $data)` | `Post` | Store the SEO fields and save |
+| `syncTags(Post $post, iterable $tags)` | `Post` | Sync tags (models or current-locale names) |
+| `publishDue()` | `int` | Publish every due scheduled post (what `posts:publish-scheduled` runs) |
+| `findBySlug(string $slug, ?string $locale = null)` | `?Post` | Find by slug through the `posts.model` seam |
+| `published()` | `Builder<Post>` | Published posts whose date has passed |
+| `query()` | `Builder<Post>` | A query on the configured `posts.model` |
+
+The model keeps its convenience methods — `$post->publish()`, `schedule()`, `archive()`,
+`unpublish()` and `syncTags()` — and each of them goes through the same manager, so behaviour,
+events and the fake are identical whichever form you use. A `posts.model` subclass can override
+them to hook in.
+
+#### Without the facade
+
+The facade is sugar over `RoundlyConsulting\Posts\PostsManager`. Inject it for the same API:
+
+```php
+use RoundlyConsulting\Posts\PostsManager;
+
+final class PublishController
+{
+    public function __construct(private PostsManager $posts) {}
+
+    public function __invoke(Post $post): Post
+    {
+        return $this->posts->publish($post);
+    }
+}
+```
+
+Or call an action directly — each facade write is one action class resolved from the container
+(`CreatePostAction`, `PublishPostAction`, `SchedulePostAction`, `ArchivePostAction`,
+`UnpublishPostAction`, `UpdatePostSeoAction`, `SyncPostTagsAction`, `PublishDuePostsAction`):
+
+```php
+use RoundlyConsulting\Posts\Actions\CreatePostAction;
+use RoundlyConsulting\Posts\DataTransferObjects\CreatePostData;
+use RoundlyConsulting\Posts\DataTransferObjects\CreatePostTranslationData;
+use RoundlyConsulting\Posts\Enums\PostStatus;
+
+app(CreatePostAction::class)->execute(new CreatePostData(
+    translations: [
+        new CreatePostTranslationData(locale: 'en', title: 'Hello', content: '<p>…</p>'),
+    ],
+    status: PostStatus::Published,       // dated now when publishedAt is omitted; fires PostPublished
+    authorType: $user->getMorphClass(),
+    authorId: $user->getKey(),
+));
+```
+
+A post created `Published` without a `publishedAt` is dated now; one created `Scheduled` must
+carry a `publishedAt` (else `InvalidPostStatusTransitionException`). Creating a published or
+scheduled post fires `PostPublished` / `PostScheduled`.
+
+#### Testing with `Posts::fake()`
+
+`Posts::fake()` swaps a recording fake in behind the facade **and** the container (it extends
+`PostsManager`, so injected managers get it too). Every write — through the facade, an injected
+manager, the builder, the model's lifecycle methods and `syncTags()`, the moderation listener or
+`posts:publish-scheduled` — is recorded instead of run: nothing is written and no event fires.
+`create()` returns an unsaved post; reads (`findBySlug()`, `published()`, `query()`) still hit
+the database.
+
+```php
+use RoundlyConsulting\Posts\DataTransferObjects\CreatePostData;
+use RoundlyConsulting\Posts\Facades\Posts;
+
+Posts::fake();
+
+// … exercise your code …
+
+Posts::assertCreated(fn (CreatePostData $data): bool => $data->translations[0]->title === 'Hello');
+Posts::assertPublished($post);                 // optionally: Posts::assertPublished($post, $at)
+Posts::assertScheduled($post, $at);
+Posts::assertArchived($post);
+Posts::assertUnpublished($post);
+Posts::assertSeoUpdated($post, fn (SeoData $seo): bool => $seo->robots === 'noindex');
+Posts::assertTagged($post, ['laravel', 'php']);
+Posts::assertPublishedDue();
+```
+
+Each has a negative twin: `assertNothingCreated()`, `assertNothingPublished()`,
+`assertNothingScheduled()`, `assertNothingArchived()`, `assertNothingUnpublished()`,
+`assertNothingSeoUpdated()`, `assertNothingTagged()`, `assertNothingPublishedDue()`.
+
 ### Authoring multilingual posts
 
 Add the `HasPosts` trait to any author model (bigint or UUID keyed):
@@ -221,15 +354,17 @@ Slugs are generated per locale from the title and de-duplicated automatically; a
 slug is normalised (`Custom Slug` → `custom-slug`) and kept unique (see [Slugs](#slugs)):
 
 ```php
-use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Posts\Facades\Posts;
 
-$post = new Post;
-$post->setTranslation('title', 'en', 'Hello world');
-$post->setTranslation('title', 'sk', 'Ahoj svet');
-$post->setTranslation('content', 'en', '<p>…</p>');
-$post->save();
+$post = Posts::draft()
+    ->title('en', 'Hello world')
+    ->title('sk', 'Ahoj svet')
+    ->content('en', '<p>…</p>')
+    ->by($user)                      // polymorphic author
+    ->save();
 
-$post->author()->associate($user);   // polymorphic author
+// Plain Eloquent works too — edit translations on the model and save:
+$post->setTranslation('perex', 'en', 'A short intro');
 $post->save();
 
 // Read a translation
@@ -247,13 +382,14 @@ order the database returns the JSON keys in).
 ### Publishing lifecycle
 
 Posts move through a `PostStatus` enum (`Draft`, `Scheduled`, `Published`, `Archived`) with a
-`published_at` timestamp. Transition methods fire events:
+`published_at` timestamp. Transitions fire events; an archived post can only go back to draft
+(anything else throws `InvalidPostStatusTransitionException`):
 
 ```php
-$post->publish();                     // PostPublished
-$post->schedule(now()->addDay());     // PostScheduled
-$post->archive();                     // PostArchived
-$post->draft();                       // PostDrafted
+Posts::publish($post);                     // PostPublished — or $post->publish()
+Posts::schedule($post, now()->addDay());   // PostScheduled — or $post->schedule($at)
+Posts::archive($post);                     // PostArchived  — or $post->archive()
+Posts::unpublish($post);                   // PostDrafted   — or $post->unpublish()
 ```
 
 Query scopes:
@@ -265,7 +401,8 @@ Post::query()->scheduled()->get();    // scheduled, or published with a future d
 Post::query()->archived()->get();
 ```
 
-Run the bundled command (or schedule it) to publish posts whose scheduled time has arrived:
+Run the bundled command (or schedule it) to publish posts whose scheduled time has arrived — it
+calls `Posts::publishDue()`, which you can also call yourself:
 
 ```bash
 php artisan posts:publish-scheduled
@@ -292,7 +429,7 @@ $laravel = Category::create(['name' => ['en' => 'Laravel'], 'parent_id' => $guid
 $post->categories()->sync([$guides->id, $laravel->id]);
 
 // Tags: pass strings (find-or-created by translated name) or Tag models
-$post->syncTags(['eloquent', 'php']);
+Posts::syncTags($post, ['eloquent', 'php']);   // or $post->syncTags([...])
 
 // Filter
 Post::query()->inCategory($laravel)->get();
@@ -320,13 +457,12 @@ description → perex):
 ```php
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
 
-$post->setSeo(new SeoData(
+Posts::seo($post, new SeoData(      // saves; $post->setSeo($data) only sets the attributes
     metaTitle: 'Custom title',
     canonical: 'https://example.test/posts/hello-world',
     ogImage: 'https://example.test/cover.png',
     robots: 'index,follow',
 ));
-$post->save();
 
 // In a Blade layout:
 {!! $post->renderMetaTags() !!}   // <title>, description, canonical, og:*, twitter:*, robots
@@ -359,10 +495,9 @@ $post->currentSlug();        // current locale → posts.locales.fallback → an
 $post->slugFor('sk');        // exactly one locale, no fallback
 $post->slugMap();            // ['en' => 'hello-world', 'sk' => 'ahoj-svet']
 
-// Swappable model: query through the seam, not Post::findBySlug() (which is always the packaged class)
-use RoundlyConsulting\Posts\Support\PostModel;
-
-PostModel::query()->whereSlug('hello-world')->first();
+// Swappable model: find through the facade, not Post::findBySlug() (which is always the packaged class)
+Posts::findBySlug('hello-world');
+Posts::query()->whereSlug('hello-world')->first();
 ```
 
 **Route binding.** With `posts.slugs.route-binding` on (default), the slug is the post's route
@@ -390,26 +525,6 @@ $request->validate([...Post::slugRules($post), 'title' => ['required', 'array']]
 
 Admins who should see a validation error instead of a silent `-2` can combine these rules with
 sluggable's `Strict` manual policy in their own model subclass.
-
-### Actions (DTO entry points)
-
-```php
-use RoundlyConsulting\Posts\Actions\CreatePostAction;
-use RoundlyConsulting\Posts\DataTransferObjects\CreatePostData;
-use RoundlyConsulting\Posts\DataTransferObjects\CreatePostTranslationData;
-use RoundlyConsulting\Posts\Enums\PostStatus;
-
-app(CreatePostAction::class)->execute(new CreatePostData(
-    translations: [
-        new CreatePostTranslationData(locale: 'en', title: 'Hello', content: '<p>…</p>'),
-    ],
-    status: PostStatus::Published,
-    authorType: $user->getMorphClass(),
-    authorId: $user->getKey(),
-));
-```
-
-`PublishPostAction` and `UpdatePostSeoAction` are also available.
 
 ### Events
 
@@ -597,7 +712,8 @@ Reports::resolve($report, by: $bob, note: 'Spam');  // quorum reached → Resolv
 
 **Moderation → visibility sync.** When a report is **upheld** (`ReportResolved`) or a post crosses
 the global `reports.threshold` (`ReportThresholdReached`), the post is auto-unpublished through its
-own lifecycle, re-emitting `PostArchived` / `PostDrafted`. This is config-gated by
+own lifecycle (`$post->archive()` / `$post->unpublish()`, so `Posts::fake()` records it),
+re-emitting `PostArchived` / `PostDrafted`. This is config-gated by
 `posts.moderation` and only ever touches a currently-published post (idempotent), ignoring any
 non-post report subject:
 
