@@ -14,4 +14,9 @@ final class InvalidPostStatusTransitionException extends PostsException
             "Cannot transition a post from [{$from->value}] to [{$to->value}].",
         );
     }
+
+    public static function scheduledWithoutDate(): self
+    {
+        return new self('A scheduled post needs a publish date.');
+    }
 }
