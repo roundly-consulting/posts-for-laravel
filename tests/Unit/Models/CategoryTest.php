@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use RoundlyConsulting\Posts\Exceptions\InvalidCategoryParentException;
 use RoundlyConsulting\Posts\Models\Category;
 use RoundlyConsulting\Posts\Models\Post;
 
@@ -49,4 +50,65 @@ it('soft deletes categories', function (): void {
 
 it('uses the configured table name', function (): void {
     expect((new Category)->getTable())->toBe(config('posts.tables.categories'));
+});
+
+it('refuses to make a category its own parent', function (): void {
+    $category = Category::factory()->create();
+
+    expect(fn () => $category->update(['parent_id' => $category->getKey()]))
+        ->toThrow(InvalidCategoryParentException::class);
+
+    expect($category->fresh()?->parent_id)->toBeNull();
+});
+
+it('refuses a parent that would close a cycle', function (): void {
+    $a = Category::factory()->create();
+    $b = Category::factory()->childOf($a)->create();
+    $c = Category::factory()->childOf($b)->create();
+
+    expect(fn () => $a->update(['parent_id' => $c->getKey()]))
+        ->toThrow(InvalidCategoryParentException::class)
+        ->and(fn () => $a->update(['parent_id' => $b->getKey()]))
+        ->toThrow(InvalidCategoryParentException::class);
+
+    expect($a->fresh()?->parent_id)->toBeNull();
+});
+
+it('refuses a cycle through a trashed category', function (): void {
+    $a = Category::factory()->create();
+    $b = Category::factory()->childOf($a)->create();
+    $c = Category::factory()->childOf($b)->create();
+    $b->delete();
+
+    $a->update(['parent_id' => $c->getKey()]);
+})->throws(InvalidCategoryParentException::class);
+
+it('still re-parents a category without a cycle', function (): void {
+    $a = Category::factory()->create();
+    $b = Category::factory()->create();
+    $c = Category::factory()->childOf($a)->create();
+
+    $c->update(['parent_id' => $b->getKey()]);
+    $c->update(['parent_id' => null]);
+    $a->update(['parent_id' => $b->getKey()]);
+
+    expect($a->fresh()?->parent_id)->toBe($b->getKey())
+        ->and($c->fresh()?->parent_id)->toBeNull();
+});
+
+it('terminates ancestors and descendants on a cycle written past the model', function (): void {
+    $a = Category::factory()->create();
+    $b = Category::factory()->childOf($a)->create();
+    $c = Category::factory()->childOf($b)->create();
+
+    Category::query()->toBase()->where('id', $a->getKey())->update(['parent_id' => $c->getKey()]);
+    $a = $a->fresh();
+    $self = Category::factory()->create();
+    Category::query()->toBase()->where('id', $self->getKey())->update(['parent_id' => $self->getKey()]);
+    $self = $self->fresh();
+
+    expect($a?->ancestors()->pluck('id')->all())->toBe([$c->getKey(), $b->getKey()])
+        ->and($a?->descendants()->pluck('id')->all())->toBe([$b->getKey(), $c->getKey()])
+        ->and($self?->ancestors()->all())->toBe([])
+        ->and($self?->descendants()->all())->toBe([]);
 });

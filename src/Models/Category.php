@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\CategoryFactory;
+use RoundlyConsulting\Posts\Exceptions\InvalidCategoryParentException;
 use RoundlyConsulting\Posts\Support\PostModel;
 use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
@@ -90,14 +91,32 @@ final class Category extends Model implements Sluggable
         )->withTimestamps();
     }
 
-    /** @return Collection<int, Category> */
+    /**
+     * Refuse a parent that would make the hierarchy loop — the category itself or one of its
+     * descendants — before anything is written.
+     */
+    protected static function booted(): void
+    {
+        self::saving(static function (Category $category): void {
+            $category->guardAgainstCycle();
+        });
+    }
+
+    /**
+     * The chain of parents, nearest first. Stops at a category it has already seen, so a cycle
+     * written past the model (a raw update) still terminates.
+     *
+     * @return Collection<int, Category>
+     */
     public function ancestors(): Collection
     {
         /** @var Collection<int, Category> $ancestors */
         $ancestors = new Collection;
+        $seen = [$this->visitKey($this) => true];
         $parent = $this->parent;
 
-        while ($parent !== null) {
+        while ($parent !== null && ! isset($seen[$this->visitKey($parent)])) {
+            $seen[$this->visitKey($parent)] = true;
             $ancestors->push($parent);
             $parent = $parent->parent;
         }
@@ -105,18 +124,77 @@ final class Category extends Model implements Sluggable
         return $ancestors;
     }
 
-    /** @return Collection<int, Category> */
+    /**
+     * Every category below this one, depth first. Each is listed once and the walk never comes
+     * back up to this category, so a cycle written past the model still terminates.
+     *
+     * @return Collection<int, Category>
+     */
     public function descendants(): Collection
     {
         /** @var Collection<int, Category> $descendants */
         $descendants = new Collection;
+        $seen = [$this->visitKey($this) => true];
 
-        foreach ($this->children as $child) {
-            $descendants->push($child);
-            $descendants = $descendants->merge($child->descendants());
-        }
+        $this->collectDescendants($this, $descendants, $seen);
 
         return $descendants;
+    }
+
+    /**
+     * @param  Collection<int, Category>  $descendants
+     * @param  array<string, true>  $seen
+     */
+    private function collectDescendants(Category $category, Collection $descendants, array &$seen): void
+    {
+        foreach ($category->children as $child) {
+            $key = $this->visitKey($child);
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $descendants->push($child);
+            $this->collectDescendants($child, $descendants, $seen);
+        }
+    }
+
+    /**
+     * Walk up from the new parent, trashed rows included (a restore would close the loop): a
+     * cycle exists when the walk reaches this category, or a category it has already passed.
+     *
+     * @throws InvalidCategoryParentException
+     */
+    private function guardAgainstCycle(): void
+    {
+        $parentId = $this->parent_id;
+
+        if ($parentId === null || ! $this->isDirty('parent_id')) {
+            return;
+        }
+
+        $self = $this->getKey();
+        $seen = [];
+        $current = $parentId;
+
+        while ($current !== null) {
+            if ((string) $current === (string) $self || isset($seen[(string) $current])) {
+                throw InvalidCategoryParentException::wouldCycle($this, $parentId);
+            }
+
+            $seen[(string) $current] = true;
+
+            $next = self::withTrashed()->whereKey($current)->value('parent_id');
+            $current = is_int($next) || is_string($next) ? $next : null;
+        }
+    }
+
+    private function visitKey(Category $category): string
+    {
+        $key = $category->getKey();
+
+        return is_int($key) || is_string($key) ? (string) $key : spl_object_hash($category);
     }
 
     protected static function newFactory(): CategoryFactory
