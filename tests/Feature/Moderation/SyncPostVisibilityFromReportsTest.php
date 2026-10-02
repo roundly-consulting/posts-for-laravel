@@ -7,6 +7,7 @@ use RoundlyConsulting\Approvals\Enums\ApprovalRule;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Events\PostArchived;
 use RoundlyConsulting\Posts\Events\PostDrafted;
+use RoundlyConsulting\Posts\Facades\Posts;
 use RoundlyConsulting\Posts\Listeners\SyncPostVisibilityFromReports;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Tests\Support\ModeratorTestModel;
@@ -202,4 +203,58 @@ it('refuses moderators the sign-off does not name and keeps the post published',
 
     expect($report->fresh()->status)->toBe(Status::Resolved)
         ->and($post->fresh()->status)->toBe(PostStatus::Archived);
+});
+
+it('takes a scheduled post off the schedule when its report is upheld', function (): void {
+    Event::fake([PostArchived::class]);
+
+    $post = Post::factory()->scheduled()->create();
+
+    reportAndResolve($post);
+
+    expect($post->fresh()->status)->toBe(PostStatus::Archived);
+    Event::assertDispatched(PostArchived::class);
+
+    $this->travel(2)->days();
+
+    expect(Posts::publishDue())->toBe(0)
+        ->and($post->fresh()->status)->toBe(PostStatus::Archived);
+});
+
+it('drafts an upheld scheduled post when configured, clearing its date', function (): void {
+    config()->set('posts.moderation.on_resolved', 'draft');
+
+    $post = Post::factory()->scheduled()->create();
+
+    reportAndResolve($post);
+
+    expect($post->fresh()->status)->toBe(PostStatus::Draft)
+        ->and($post->fresh()->published_at)->toBeNull();
+
+    $this->travel(2)->days();
+
+    expect(Posts::publishDue())->toBe(0);
+});
+
+it('archives a scheduled post that crosses the report threshold', function (): void {
+    config()->set('reports.threshold', 2);
+
+    $post = Post::factory()->scheduled()->create();
+
+    Reports::report($post)->by(ReaderTestModel::create(['name' => 'A']))->for('spam')->create();
+    Reports::report($post)->by(ReaderTestModel::create(['name' => 'B']))->for('spam')->create();
+
+    expect($post->fresh()->status)->toBe(PostStatus::Archived);
+});
+
+it('leaves a draft untouched when its report is upheld', function (): void {
+    Event::fake([PostArchived::class, PostDrafted::class]);
+
+    $post = Post::factory()->draft()->create();
+
+    reportAndResolve($post);
+
+    expect($post->fresh()->status)->toBe(PostStatus::Draft);
+    Event::assertNotDispatched(PostArchived::class);
+    Event::assertNotDispatched(PostDrafted::class);
 });

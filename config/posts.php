@@ -239,7 +239,9 @@ return [
     | Integration with roundly-consulting/reports-for-laravel. When a report
     | against a post is upheld, or the post crosses the global reports threshold
     | (config('reports.threshold')), the post can be auto-unpublished through its
-    | own lifecycle (re-emitting PostArchived / PostDrafted). Because reports
+    | own lifecycle (re-emitting PostArchived / PostDrafted). A scheduled post is
+    | taken off the schedule the same way, so it never goes live; drafts and
+    | archived posts are left alone. Because reports
     | routes resolution through approvals, this yields multi-moderator moderation
     | with no extra code. Set both keys to disable auto-moderation entirely.
     |

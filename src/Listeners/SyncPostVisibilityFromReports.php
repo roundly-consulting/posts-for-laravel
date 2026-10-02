@@ -22,8 +22,9 @@ use RoundlyConsulting\Reports\Events\ReportThresholdReached;
  * reports is polymorphic and shared, every subject is guarded against the
  * configured post model before acting; non-post subjects are ignored.
  *
- * All behaviour is config-gated by `posts.moderation`; the transition is
- * idempotent — a post that is not currently Published is left untouched.
+ * All behaviour is config-gated by `posts.moderation`. It acts on a post that is live or on
+ * its way there — Published, or Scheduled (which would otherwise go live at its date through
+ * `publishDue()`) — and leaves a draft or an archived post untouched.
  */
 final class SyncPostVisibilityFromReports
 {
@@ -59,9 +60,10 @@ final class SyncPostVisibilityFromReports
     {
         $post = $this->resolvePost($subject);
 
-        // Only act on a currently-published post so the transition stays
-        // idempotent (never double-archives / re-drafts an unpublished post).
-        if (! $post instanceof Post || $post->status !== PostStatus::Published) {
+        // A scheduled post is taken off the schedule too: left alone, `publishDue()` would put
+        // the moderated content live at its date. Drafts and archived posts are left as they
+        // are, so the sync never double-archives or re-drafts.
+        if (! $post instanceof Post || ! in_array($post->status, [PostStatus::Published, PostStatus::Scheduled], true)) {
             return;
         }
 
