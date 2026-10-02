@@ -10,6 +10,7 @@ use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\Posts\Support\ContentMediaRenderer;
+use RoundlyConsulting\Posts\Support\MediaUrl;
 
 /**
  * First-class media for the bundled Post model, built on
@@ -66,9 +67,18 @@ trait HasPostMedia
         return $this->getFirstMedia($this->featuredBucket());
     }
 
+    /**
+     * The featured image's URL — `$variant`'s once it is generated, else the original's — or the
+     * bucket's fallback URL ('' when none) when there is no featured image. Never throws for an
+     * unknown or not-yet-generated variant.
+     */
     public function featuredImageUrl(string $variant = ''): string
     {
-        return $this->getFirstMediaUrl($this->featuredBucket(), $variant);
+        $media = $this->featuredImage();
+
+        return $media instanceof Media
+            ? MediaUrl::of($media, $variant)
+            : $this->getFirstMediaUrl($this->featuredBucket());
     }
 
     /** @return Collection<int, Media> */
@@ -77,12 +87,16 @@ trait HasPostMedia
         return $this->getMedia($this->galleryBucket());
     }
 
-    /** @return list<string> */
+    /**
+     * The gallery's URLs, in order — each `$variant`'s once it is generated, else the original's.
+     *
+     * @return list<string>
+     */
     public function galleryImageUrls(string $variant = ''): array
     {
         return array_values(
             $this->galleryImages()
-                ->map(fn (Media $media): string => $media->getUrl($variant))
+                ->map(fn (Media $media): string => MediaUrl::of($media, $variant))
                 ->all(),
         );
     }
@@ -99,7 +113,9 @@ trait HasPostMedia
      * HTML sanitizer of its choice; this package never sanitizes, on write or on render.
      *
      * Resolution is a single batched query over the referenced UUIDs and never throws on a
-     * missing/unauthorized UUID (it is stripped or kept per `posts.media.inline.on_missing`).
+     * missing/unauthorized UUID (it is stripped or kept per `posts.media.inline.on_missing`), nor
+     * on a variant — a token's `|variant` or `posts.media.inline.default_variant` — that is
+     * unknown or not generated yet: the image then renders from its original.
      */
     public function renderContent(?string $locale = null): HtmlString
     {

@@ -145,3 +145,34 @@ it('returns the stored body as raw HTML, verbatim — it never sanitizes', funct
     expect($html)->toBeInstanceOf(HtmlString::class)
         ->and((string) $html)->toBe($body);
 })->with(['inline media on' => true, 'inline media off' => false]);
+
+it('falls back to the original for a variant that was never generated', function (): void {
+    [$post, $media] = postWithContentImage();
+
+    $post->setTranslation('content', 'en', "x [media:{$media->uuid}|bogus] y")->save();
+
+    $html = (string) $post->renderContent();
+
+    expect($html)->toContain('<img src="'.e($media->getUrl()).'"')
+        ->and($html)->not->toContain('bogus');
+});
+
+it('falls back to the original when the default variant is not generated yet', function (): void {
+    config()->set('posts.media.inline.default_variant', 'thumb');
+
+    [$post, $media] = postWithContentImage();
+
+    $post->setTranslation('content', 'en', "x [media:{$media->uuid}] y")->save();
+
+    expect((string) $post->renderContent())->toContain('<img src="'.e($media->getUrl()).'"');
+});
+
+it('uses the default variant once it is generated', function (): void {
+    config()->set('posts.media.inline.default_variant', 'responsive-320');
+
+    [$post, $media] = postWithContentImage();
+
+    $post->setTranslation('content', 'en', "x [media:{$media->uuid}] y")->save();
+
+    expect((string) $post->renderContent())->toContain('<img src="'.e($media->getUrl('responsive-320')).'"');
+});

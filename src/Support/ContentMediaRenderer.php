@@ -70,8 +70,9 @@ final class ContentMediaRenderer
     private function renderMedia(Media $media, string $variant): string
     {
         if ($media->isImage()) {
+            // An unknown or not-yet-generated variant renders the original, never InvalidVariant.
             if ($variant !== '') {
-                return '<img src="'.e($media->getUrl($variant)).'" alt="'.e($media->name).'">';
+                return '<img src="'.e(MediaUrl::of($media, $variant)).'" alt="'.e($media->name).'">';
             }
 
             return $media->responsiveImage('', ['alt' => $media->name]);
