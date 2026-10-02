@@ -14,6 +14,7 @@ use RoundlyConsulting\Posts\Tests\Support\ReaderTestModel;
 use RoundlyConsulting\Reports\Enums\Status;
 use RoundlyConsulting\Reports\Events\ReportResolved;
 use RoundlyConsulting\Reports\Exceptions\MissingModeratorsException;
+use RoundlyConsulting\Reports\Exceptions\ModeratorRequiredException;
 use RoundlyConsulting\Reports\Facades\Reports;
 use RoundlyConsulting\Reports\Models\Report;
 
@@ -167,3 +168,38 @@ it('surfaces the missing-moderators error unchanged', function (): void {
 
     Reports::moderate($report)->open();
 })->throws(MissingModeratorsException::class);
+
+it('refuses moderators the sign-off does not name and keeps the post published', function (): void {
+    $post = Post::factory()->published()->create();
+
+    $report = Reports::report($post)
+        ->by(ReaderTestModel::create(['name' => 'Ada']))
+        ->for('spam')
+        ->create();
+
+    $alice = ModeratorTestModel::create(['name' => 'Alice']);
+    $bob = ModeratorTestModel::create(['name' => 'Bob']);
+    $mallory = ModeratorTestModel::create(['name' => 'Mallory']);
+    $trudy = ModeratorTestModel::create(['name' => 'Trudy']);
+
+    Reports::moderate($report)
+        ->requiring([$alice, $bob])
+        ->rule(ApprovalRule::Unanimous)
+        ->open();
+
+    foreach ([$mallory, $trudy] as $outsider) {
+        expect(fn () => Reports::resolve($report, by: $outsider))
+            ->toThrow(ModeratorRequiredException::class);
+    }
+
+    expect(fn () => Reports::resolve($report))->toThrow(ModeratorRequiredException::class);
+
+    expect($report->fresh()->status)->not->toBe(Status::Resolved)
+        ->and($post->fresh()->status)->toBe(PostStatus::Published);
+
+    Reports::resolve($report, by: $alice);
+    Reports::resolve($report, by: $bob);
+
+    expect($report->fresh()->status)->toBe(Status::Resolved)
+        ->and($post->fresh()->status)->toBe(PostStatus::Archived);
+});
