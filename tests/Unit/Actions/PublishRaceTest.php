@@ -12,6 +12,7 @@ use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Exceptions\InvalidPostStatusTransitionException;
 use RoundlyConsulting\Posts\Facades\Posts;
 use RoundlyConsulting\Posts\Models\Post;
+use RoundlyConsulting\Testing\Database\DriverMatrix;
 use RoundlyConsulting\Testing\Fixtures\LockRecorder;
 use RoundlyConsulting\Testing\Fixtures\LockRecordingGrammar;
 
@@ -161,7 +162,7 @@ it('decides under a row lock taken inside the write transaction', function (): v
         ->and($locks[0]['sql'])->toContain('"status" = ?')->toContain('"published_at" <= ?')
         ->and($locks[1]['transactionDepth'])->toBe(2)
         ->and($due->fresh()?->status)->toBe(PostStatus::Published);
-});
+})->skip(fn (): bool => DriverMatrix::driver() !== 'sqlite', 'recording grammar is sqlite-only');
 
 it('publishes an unsaved post from its in-memory status', function (): void {
     $post = Post::factory()->draft()->make();
