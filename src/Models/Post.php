@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Posts\Models;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -107,6 +108,21 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
             'meta_title' => 'array',
             'meta_description' => 'array',
         ];
+    }
+
+    /**
+     * Store `published_at` as its instant in the app timezone, whatever zone the given date
+     * carries. `published()` and `publishDue()` compare the column against `now()`, so a date
+     * stored as another zone's wall-clock time (`now('Asia/Tokyo')->addHour()` as `22:00` on a
+     * UTC app) would go live hours late — or early, west of the app's zone.
+     *
+     * @return Attribute<CarbonImmutable|null, mixed>
+     */
+    protected function publishedAt(): Attribute
+    {
+        return Attribute::set(fn (mixed $value): mixed => $value === null || $value === ''
+            ? null
+            : $this->fromDateTime($this->asDateTime($value)->setTimezone(date_default_timezone_get())));
     }
 
     /** @return MorphTo<Model, $this> */
