@@ -270,13 +270,8 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     {
         $bag = is_array($this->seo) ? $this->seo : [];
 
-        $metaTitle = $this->getTranslation('meta_title', app()->getLocale(), false)
-            ?: $this->getTranslation('title', app()->getLocale(), false)
-            ?: null;
-
-        $metaDescription = $this->getTranslation('meta_description', app()->getLocale(), false)
-            ?: $this->getTranslation('perex', app()->getLocale(), false)
-            ?: null;
+        $metaTitle = $this->seoText('meta_title', 'title');
+        $metaDescription = $this->seoText('meta_description', 'perex');
 
         $base = SeoData::fromBag($bag, $metaTitle, $metaDescription);
 
@@ -400,6 +395,22 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     protected static function newFactory(): PostFactory
     {
         return PostFactory::new();
+    }
+
+    /**
+     * A meta field with the same locale fallback `$post->title` uses: the current locale's meta
+     * value, else its `$content` value (meta title → title), then the same pair along the
+     * fallback chain (the fallback locale, then the lowest-sorting locale holding a value).
+     */
+    private function seoText(string $meta, string $content): ?string
+    {
+        $locale = app()->getLocale();
+
+        return $this->getTranslation($meta, $locale, false)
+            ?: $this->getTranslation($content, $locale, false)
+            ?: $this->getTranslation($meta, $locale)
+            ?: $this->getTranslation($content, $locale)
+            ?: null;
     }
 
     /** The featured image URL used as the og:image fallback, or null when unavailable/disabled. */

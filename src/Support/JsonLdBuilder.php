@@ -23,7 +23,8 @@ final class JsonLdBuilder
         $data = [
             '@context' => 'https://schema.org',
             '@type' => (string) config('posts.json-ld.type', 'BlogPosting'),
-            'headline' => $post->getTranslation('title', $locale, false) ?: '',
+            // The same locale fallback as `$post->title` and the meta tags.
+            'headline' => $post->getTranslation('title', $locale),
             'description' => $seo->metaDescription ?? '',
         ];
 
@@ -62,7 +63,7 @@ final class JsonLdBuilder
         }
 
         $keywords = $post->tags
-            ->map(fn ($tag): string => $tag->getTranslation('name', $locale, false))
+            ->map(fn ($tag): string => $tag->getTranslation('name', $locale))
             ->filter(fn (string $name): bool => $name !== '')
             ->values();
 
@@ -71,7 +72,7 @@ final class JsonLdBuilder
         }
 
         $sections = $post->categories
-            ->map(fn ($category): string => $category->getTranslation('name', $locale, false))
+            ->map(fn ($category): string => $category->getTranslation('name', $locale))
             ->filter(fn (string $name): bool => $name !== '')
             ->values();
 
