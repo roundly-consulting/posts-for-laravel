@@ -16,13 +16,13 @@ final readonly class UnpublishPostAction
 
     /**
      * Move the post back to draft from any status, clearing its publish date, and dispatch
-     * {@see PostDrafted}.
+     * {@see PostDrafted}. A post that is already a draft is left as it is and fires nothing.
      */
     public function execute(Post $post): Post
     {
-        $this->transition->execute($post, PostStatus::Draft, null);
-
-        PostDrafted::dispatch($post->id);
+        if ($this->transition->execute($post, PostStatus::Draft, null)) {
+            PostDrafted::dispatch($post->id);
+        }
 
         return $post;
     }

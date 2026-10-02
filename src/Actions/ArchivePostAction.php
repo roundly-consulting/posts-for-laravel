@@ -16,13 +16,13 @@ final readonly class ArchivePostAction
 
     /**
      * Archive the post, keeping its publish date, and dispatch {@see PostArchived}. An archived
-     * post can only be moved back to draft.
+     * post can only be moved back to draft; archiving it again is a no-op that fires nothing.
      */
     public function execute(Post $post): Post
     {
-        $this->transition->execute($post, PostStatus::Archived, $post->published_at);
-
-        PostArchived::dispatch($post->id);
+        if ($this->transition->execute($post, PostStatus::Archived, null, keepDate: true)) {
+            PostArchived::dispatch($post->id);
+        }
 
         return $post;
     }

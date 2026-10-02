@@ -133,13 +133,14 @@ it('moves a post through its lifecycle through the facade', function (): void {
     expect(Posts::schedule($post, CarbonImmutable::parse('2026-07-01 00:00:00'))->status)->toBe(PostStatus::Scheduled)
         ->and(Posts::publish($post)->status)->toBe(PostStatus::Published)
         ->and($post->published_at?->toDateTimeString())->toBe('2026-06-06 06:00:00')
-        ->and(Posts::publish($post, CarbonImmutable::parse('2026-06-01 00:00:00'))->published_at?->toDateTimeString())->toBe('2026-06-01 00:00:00')
+        // Already published: kept as it is — no re-date, no second event.
+        ->and(Posts::publish($post, CarbonImmutable::parse('2026-06-01 00:00:00'))->published_at?->toDateTimeString())->toBe('2026-06-06 06:00:00')
         ->and(Posts::archive($post)->status)->toBe(PostStatus::Archived)
         ->and(Posts::unpublish($post)->status)->toBe(PostStatus::Draft)
         ->and($post->fresh()?->status)->toBe(PostStatus::Draft);
 
     Event::assertDispatched(PostScheduled::class);
-    Event::assertDispatchedTimes(PostPublished::class, 2);
+    Event::assertDispatchedTimes(PostPublished::class, 1);
     Event::assertDispatched(PostArchived::class);
     Event::assertDispatched(PostDrafted::class);
 });

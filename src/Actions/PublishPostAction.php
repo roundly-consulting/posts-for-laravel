@@ -17,15 +17,17 @@ final readonly class PublishPostAction
     ) {}
 
     /**
-     * Publish the post at `$at` (now when omitted) and dispatch {@see PostPublished}.
+     * Publish the post at `$at` (now when omitted) and dispatch {@see PostPublished}. A post that
+     * is already published is left as it is — its date is kept and no event fires — so a
+     * repeated call, or a second `publishDue()` run racing the first, never re-dates it.
      *
      * @throws InvalidPostStatusTransitionException when the post is archived
      */
     public function execute(Post $post, ?CarbonInterface $at = null): Post
     {
-        $this->transition->execute($post, PostStatus::Published, $at ?? now());
-
-        PostPublished::dispatch($post->id);
+        if ($this->transition->execute($post, PostStatus::Published, $at ?? now())) {
+            PostPublished::dispatch($post->id);
+        }
 
         return $post;
     }

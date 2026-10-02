@@ -24,6 +24,7 @@ final readonly class SchedulePostAction
      */
     public function execute(Post $post, CarbonInterface $at): Post
     {
+        // Scheduling always moves the date, so it always fires.
         $this->transition->execute($post, PostStatus::Scheduled, $at);
 
         PostScheduled::dispatch($post->id);
