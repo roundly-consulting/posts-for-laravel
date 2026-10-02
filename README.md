@@ -153,13 +153,13 @@ The published `config/posts.php`:
 | `media.featured_fallback_url` | ?string | `null` | `POSTS_MEDIA_FEATURED_FALLBACK` | URL `featuredImageUrl()` returns when no featured image is set. |
 | `media.responsive_widths` | ?list<int> | `null` | — | Responsive width ladder (`null` = media-library default). |
 | `media.seo_og_image` | bool | `true` | — | Fall back `og:image`/JSON-LD `image` to the featured image. |
-| `media.og_variant` | string | `''` | — | Variant used for the og:image fallback (`''` = original). |
+| `media.og_variant` | string | `''` | — | Variant used for the og:image fallback (`''` = original). Name a variant media-library generates for the featured bucket (e.g. `responsive-640`); until it exists, or for an unknown name, the original's URL is used. |
 | `media.warm_on_publish` | bool | `true` | — | Queue variant generation for the post's media on publish. |
 | `media.inline.enabled` | bool | `true` | — | Expand `[media:UUID]` tokens in rendered content. |
-| `media.inline.default_variant` | string | `''` | — | Variant applied to inline tokens with no `\|variant`. |
+| `media.inline.default_variant` | string | `''` | — | Variant applied to inline tokens with no `\|variant`. Like a token's own `\|variant`, one that is unknown or not generated yet renders the original image. |
 | `media.inline.on_missing` | `strip`\|`keep` | `strip` | — | Drop or keep tokens whose media is missing/unauthorized. |
-| `moderation.on_resolved` | `archive`\|`draft`\|`null` | `archive` | — | Auto-unpublish action when a report is upheld (`null` = disable). |
-| `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a post when it crosses the global `reports.threshold`. |
+| `moderation.on_resolved` | `archive`\|`draft`\|`null` | `archive` | — | Auto-unpublish action when a report against a published or scheduled post is upheld (`null` = disable). |
+| `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a published or scheduled post when it crosses the global `reports.threshold`. |
 
 ### Key types
 
@@ -392,6 +392,15 @@ Posts::archive($post);                     // PostArchived  — or $post->archiv
 Posts::unpublish($post);                   // PostDrafted   — or $post->unpublish()
 ```
 
+Publishing, archiving or unpublishing a post that already has that status is a no-op: nothing
+is written, the publish date is kept and no event fires (re-scheduling always moves the date).
+Each move is decided against the **stored** status under a row lock, so a stale copy of a post
+that a moderator archived meanwhile throws instead of going live.
+
+Dates may carry any timezone — `now('Asia/Tokyo')->addHour()` — and are stored as that same
+instant in the app timezone (`config('app.timezone')`), the zone `published()` and
+`publishDue()` compare against.
+
 Query scopes:
 
 ```php
@@ -409,9 +418,17 @@ php artisan posts:publish-scheduled
 ```
 
 ```php
-// app/Console/Kernel.php
-$schedule->command('posts:publish-scheduled')->everyMinute();
+// routes/console.php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('posts:publish-scheduled')->everyMinute()->withoutOverlapping()->onOneServer();
 ```
+
+`withoutOverlapping()` / `onOneServer()` save work, but correctness does not depend on them:
+each due post is claimed under a row lock (still scheduled, still due) before it is published, so
+overlapping runs publish it — and fire `PostPublished` — once, and a post archived, drafted or
+rescheduled after a run listed it is skipped. (`onOneServer()` needs a cache store shared by your
+servers.)
 
 `PostStatus` builds on
 [`roundly-consulting/enums-for-laravel`](https://github.com/roundly-consulting/enums-for-laravel),
@@ -439,6 +456,9 @@ Post::query()->withTag('php')->get();
 // Category hierarchy helpers
 $laravel->ancestors();    // [Guides]
 $guides->descendants();   // [Laravel, …]
+
+// A parent that would make the hierarchy loop is refused before anything is saved
+$guides->update(['parent_id' => $laravel->id]);   // throws InvalidCategoryParentException
 ```
 
 Category and tag `name` and `slug` are both translatable, and slugs are auto-generated from
@@ -452,7 +472,9 @@ pulled in.
 
 `meta_title` / `meta_description` are translatable; the remaining SEO fields live in a
 non-translatable `seo` bag. Sensible fallbacks are applied (meta title → title, meta
-description → perex):
+description → perex), with the same locale fallback `$post->title` uses: the current locale's
+meta value or title first, then the fallback locale's, then any locale's — so a post that only
+has an English title still renders a `<title>` and a JSON-LD `headline` on a Slovak page:
 
 ```php
 use RoundlyConsulting\Posts\DataTransferObjects\SeoData;
@@ -529,7 +551,9 @@ sluggable's `Strict` manual policy in their own model subclass.
 ### Events
 
 `PostPublished`, `PostScheduled`, `PostArchived`, `PostDrafted` (each carrying the `postId`)
-are dispatched on the matching transition — listen for them to extend behaviour.
+are dispatched on the matching transition — listen for them to extend behaviour. They fire only
+when the status actually changes (every `schedule()` fires `PostScheduled`), so a repeated call or
+a racing `publishDue()` run never fires one twice.
 
 ### Status labels & select options
 
@@ -591,7 +615,13 @@ $post->galleryImageUrls();       // list<string>
 body, attach those files to the post's content bucket, then render. Images become responsive
 `<img>` tags, other files become links; tokens resolve in a **single batched query** against the
 post's **own** content media only (never an arbitrary global UUID), and a missing/unauthorized
-token is silently stripped (or kept — see `posts.media.inline.on_missing`):
+token is silently stripped (or kept — see `posts.media.inline.on_missing`).
+
+A variant — a token's `|variant` or `posts.media.inline.default_variant` — should be one
+media-library generates for the content bucket (e.g. `responsive-640`). Variants are generated on
+a queue, so until it exists (or when the name is unknown, say an author's typo) the image renders
+from its original instead of failing the page. `featuredImageUrl($variant)` and
+`galleryImageUrls($variant)` fall back the same way:
 
 ```php
 $image = $post->addMedia($file)->toMediaBucket($post->contentBucket());
@@ -609,7 +639,8 @@ $post->setTranslation('content', 'en', "Intro [media:{$image->uuid}] outro")->sa
 > this package never sanitizes, neither on save nor on render.
 
 **SEO fallback.** When a post has no explicit `og:image`, `seo()->ogImage` and the JSON-LD `image`
-fall back to the featured image URL (toggle with `posts.media.seo_og_image`).
+fall back to the featured image URL (toggle with `posts.media.seo_og_image`) — the
+`posts.media.og_variant` variant once it is generated, the original until then.
 
 **Warm variants on publish.** Publishing a post dispatches a queued media `GenerateVariantsJob`
 for its featured/gallery/content media so responsive derivatives are ready when it goes live
@@ -699,7 +730,19 @@ Post::query()->reportedMoreThan(5)->get();       // over a threshold
 
 **Multi-moderator sign-off.** Because reports routes resolution through
 [`approvals-for-laravel`](https://github.com/roundly-consulting/approvals-for-laravel), a report can
-require N moderators to agree before it settles:
+require N moderators to agree before it settles. Moderators are saved Eloquent models — typically
+your `User` with the approvals `GivesApprovals` trait (which adds its `givenApprovals()` relation):
+
+```php
+use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\Approvals\Interfaces\GivesApprovalsInterface;
+use RoundlyConsulting\Approvals\Traits\GivesApprovals;
+
+class User extends Model implements GivesApprovalsInterface
+{
+    use GivesApprovals;
+}
+```
 
 ```php
 use RoundlyConsulting\Approvals\Enums\ApprovalRule;
@@ -707,15 +750,22 @@ use RoundlyConsulting\Approvals\Enums\ApprovalRule;
 Reports::moderate($report)->requiring([$alice, $bob])->rule(ApprovalRule::Quorum)->quorum(2)->open();
 
 Reports::resolve($report, by: $alice);              // 1 of 2 — stays open
-Reports::resolve($report, by: $bob, note: 'Spam');  // quorum reached → Resolved
+Reports::resolve($report, by: $bob, note: 'Spam');  // quorum reached → Resolved → post archived
+
+Reports::resolve($report, by: $mallory);            // not named → ModeratorRequiredException
 ```
+
+Only the moderators the request names (or their delegates) can settle it: anyone else — and a
+`resolve()` with no actor — gets reports' `ModeratorRequiredException`, nothing is recorded, and
+the post stays as it is.
 
 **Moderation → visibility sync.** When a report is **upheld** (`ReportResolved`) or a post crosses
 the global `reports.threshold` (`ReportThresholdReached`), the post is auto-unpublished through its
 own lifecycle (`$post->archive()` / `$post->unpublish()`, so `Posts::fake()` records it),
-re-emitting `PostArchived` / `PostDrafted`. This is config-gated by
-`posts.moderation` and only ever touches a currently-published post (idempotent), ignoring any
-non-post report subject:
+re-emitting `PostArchived` / `PostDrafted`. This is config-gated by `posts.moderation` and touches
+a post that is published **or scheduled** — a scheduled post is taken off the schedule, so
+`publishDue()` never puts moderated content live. Drafts and archived posts are left alone
+(idempotent), and any non-post report subject is ignored:
 
 ```php
 'moderation' => [

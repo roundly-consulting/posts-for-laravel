@@ -217,13 +217,17 @@ return [
         // when no explicit og:image is set on the post.
         'seo_og_image' => true,
 
-        // Variant name used for the og:image fallback ('' => the original).
+        // Variant name used for the og:image fallback ('' => the original). Name a
+        // variant media-library generates for the featured bucket (e.g. 'responsive-640');
+        // until it exists — or if the name is unknown — the original's URL is used.
         'og_variant' => '',
 
         // Dispatch a queued media GenerateVariantsJob for the post's media on publish.
         'warm_on_publish' => true,
 
         // Inline [media:UUID] / [media:UUID|variant] rendering in the post body.
+        // "default_variant" applies to tokens without a |variant. A variant that is
+        // unknown or not generated yet renders the original image instead.
         'inline' => [
             'enabled' => true,
             'default_variant' => '',
