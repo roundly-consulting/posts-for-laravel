@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Posts\Concerns;
 
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
+use RoundlyConsulting\Posts\Support\PostsConfig;
+
 /**
  * A small, self-contained replacement for the slice of translatable-attribute
  * behaviour the package relies on, with no third-party dependency.
@@ -139,9 +142,17 @@ trait HasTranslatableAttributes
 
     private function translatableFallbackLocale(): ?string
     {
-        $configured = config('translatable.fallback_locale')
-            ?? config('posts.locales.fallback')
-            ?? config('app.fallback_locale');
+        if (config('translatable.fallback_locale') !== null) {
+            $configured = config('translatable.fallback_locale');
+
+            if (! is_string($configured) || trim($configured) === '') {
+                throw InvalidConfigurationException::notAString('translatable.fallback_locale', $configured);
+            }
+
+            return $configured;
+        }
+
+        $configured = PostsConfig::configuredFallbackLocale() ?? config('app.fallback_locale');
 
         return is_string($configured) && $configured !== '' ? $configured : null;
     }

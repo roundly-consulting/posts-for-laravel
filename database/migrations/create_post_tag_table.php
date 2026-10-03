@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 
 return new class extends Migration
 {
@@ -13,7 +14,7 @@ return new class extends Migration
     {
         $primaryKeyType = KeyType::fromConfig('posts.primary_key_type');
 
-        Schema::create((string) config('posts.tables.tag_post', 'post_tag'), function (Blueprint $table) use ($primaryKeyType): void {
+        Schema::create(PostsConfig::tagPostTable(), function (Blueprint $table) use ($primaryKeyType): void {
             $table->ownerKey('post_id', $primaryKeyType, nullable: false, index: true);
             $table->ownerKey('tag_id', $primaryKeyType, nullable: false, index: true);
             $table->timestamps();

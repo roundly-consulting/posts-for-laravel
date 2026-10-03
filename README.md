@@ -140,9 +140,9 @@ The published `config/posts.php`:
 | `slugs.lock-when-published` | bool | `false` | — | Freeze a published post's slugs: no regeneration, and a manual change throws `SlugLockedException`. |
 | `seo.site-name` | ?string | `null` | `POSTS_SITE_NAME` | Default `og:site_name` (a post can override it). |
 | `seo.twitter-site` | ?string | `null` | `POSTS_TWITTER_SITE` | Default `twitter:site` handle. |
-| `seo.default-card` | string | `summary_large_image` | — | Default Twitter card type. |
+| `seo.default-card` | string | `summary_large_image` | — | Default Twitter card type: `summary`, `summary_large_image`, `app` or `player`. |
 | `seo.default-robots` | string | `index,follow` | — | Default robots directive. |
-| `json-ld.type` | string | `BlogPosting` | — | schema.org `@type` (`BlogPosting` or `Article`). |
+| `json-ld.type` | `BlogPosting`\|`Article` | `BlogPosting` | — | schema.org `@type`. |
 | `json-ld.author-attribute` | string | `name` | — | Author model attribute used for the author name. |
 | `json-ld.publisher.name` | ?string | `null` | `POSTS_PUBLISHER_NAME` | Publisher organisation name. |
 | `json-ld.publisher.logo` | ?string | `null` | `POSTS_PUBLISHER_LOGO` | Publisher logo URL. |
@@ -151,7 +151,7 @@ The published `config/posts.php`:
 | `media.content_bucket` | string | `content` | — | Bucket owning media referenced inline by `[media:UUID]`. |
 | `media.disk` | ?string | `null` | `POSTS_MEDIA_DISK` | Disk for post media (`null` = media-library default). |
 | `media.featured_fallback_url` | ?string | `null` | `POSTS_MEDIA_FEATURED_FALLBACK` | URL `featuredImageUrl()` returns when no featured image is set. |
-| `media.responsive_widths` | ?list<int> | `null` | — | Responsive width ladder (`null` = media-library default). |
+| `media.responsive_widths` | ?list<int> | `null` | — | Responsive width ladder of positive integers (`null` = media-library default, `[]` = no variants). |
 | `media.seo_og_image` | bool | `true` | — | Fall back `og:image`/JSON-LD `image` to the featured image. |
 | `media.og_variant` | string | `''` | — | Variant used for the og:image fallback (`''` = original). Name a variant media-library generates for the featured bucket (e.g. `responsive-640`); until it exists, or for an unknown name, the original's URL is used. |
 | `media.warm_on_publish` | bool | `true` | — | Queue variant generation for the post's media on publish. |
@@ -164,6 +164,17 @@ The published `config/posts.php`:
 Every `bool` switch is read strictly: `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no`
 turn it off, and anything else (say `POSTS_SLUG_HISTORY=disabled`) throws
 `InvalidConfigurationException` instead of quietly reading as the default.
+
+Every other setting is just as strict. A default applies only when the key is absent (unset or
+`null`). A string setting — a table or bucket name, the morph name, the slug source or
+separator, a locale, an SEO / JSON-LD value, the media disk or fallback URL — must be a
+non-empty string when set: a blank (`POSTS_SITE_NAME=` included) or non-string value throws
+rather than being cast to `''` or replaced by the default. A `seo.default-card`, `json-ld.type`,
+`media.inline.on_missing` or `moderation.on_resolved` value outside its list throws (an
+`on_resolved` typo no longer skips the auto-unpublish), and so does a responsive width that is
+not a positive integer. The variant names (`media.og_variant`, `media.inline.default_variant`)
+take any string, `''` meaning the original. `php artisan about` renders a broken non-boolean
+setting as `INVALID`.
 
 ### Key types
 

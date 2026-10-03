@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 
 /**
  * Add post authorship to any model (typically the application's User model),
@@ -20,6 +21,6 @@ trait HasPosts
     /** @return MorphMany<Post, $this> */
     public function posts(): MorphMany
     {
-        return $this->morphMany(PostModel::class(), (string) config('posts.author.morph-name', 'author'));
+        return $this->morphMany(PostModel::class(), PostsConfig::authorMorphName());
     }
 }

@@ -17,6 +17,7 @@ use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\CategoryFactory;
 use RoundlyConsulting\Posts\Exceptions\InvalidCategoryParentException;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
@@ -55,7 +56,7 @@ final class Category extends Model implements Sluggable
 
     public function getTable(): string
     {
-        return (string) config('posts.tables.categories', 'post_categories');
+        return PostsConfig::categoriesTable();
     }
 
     /** @return array<string, string> */
@@ -85,7 +86,7 @@ final class Category extends Model implements Sluggable
     {
         return $this->belongsToMany(
             PostModel::class(),
-            (string) config('posts.tables.category_post', 'category_post'),
+            PostsConfig::categoryPostTable(),
             'category_id',
             'post_id',
         )->withTimestamps();

@@ -32,12 +32,12 @@ final class PostSlugs
     {
         $definition = SlugDefinition::for('slug')
             ->from($source)
-            ->separator((string) config('posts.slugs.separator', '-'))
+            ->separator(PostsConfig::slugSeparator())
             ->localized()
             ->onUpdate(UpdatePolicy::IfEmpty)
             ->manual(ManualSlugPolicy::Normalize)
             ->whenEmptySource(EmptySourcePolicy::Skip)
-            ->fallbackLocale(static fn (): string => (string) config('posts.locales.fallback', 'en'))
+            ->fallbackLocale(static fn (): string => PostsConfig::fallbackLocale())
             ->fallback(LocaleFallback::Any)
             ->perLocaleUniqueness()
             ->includeTrashed();

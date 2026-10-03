@@ -30,6 +30,7 @@ use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\PostsManager;
 use RoundlyConsulting\Posts\Support\JsonLdBuilder;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Reports\Contracts\Reportable;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
@@ -92,7 +93,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
 
     public function getTable(): string
     {
-        return (string) config('posts.tables.posts', 'posts');
+        return PostsConfig::postsTable();
     }
 
     /** @return array<string, string> */
@@ -129,7 +130,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     /** @return MorphTo<Model, $this> */
     public function author(): MorphTo
     {
-        return $this->morphTo((string) config('posts.author.morph-name', 'author'));
+        return $this->morphTo(PostsConfig::authorMorphName());
     }
 
     /** @return BelongsToMany<Category, $this> */
@@ -137,7 +138,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     {
         return $this->belongsToMany(
             Category::class,
-            (string) config('posts.tables.category_post', 'category_post'),
+            PostsConfig::categoryPostTable(),
             'post_id',
             'category_id',
         )->withTimestamps();
@@ -148,7 +149,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     {
         return $this->belongsToMany(
             Tag::class,
-            (string) config('posts.tables.tag_post', 'post_tag'),
+            PostsConfig::tagPostTable(),
             'post_id',
             'tag_id',
         )->withTimestamps();
@@ -284,11 +285,11 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
             ogDescription: $base->ogDescription ?? $base->metaDescription,
             ogImage: $base->ogImage ?? $this->fallbackOgImage(),
             ogType: $base->ogType ?? 'article',
-            twitterCard: $base->twitterCard ?? (string) config('posts.seo.default-card', 'summary_large_image'),
-            twitterSite: $base->twitterSite ?? self::stringConfig('posts.seo.twitter-site'),
+            twitterCard: $base->twitterCard ?? PostsConfig::defaultCard(),
+            twitterSite: $base->twitterSite ?? PostsConfig::twitterSite(),
             twitterCreator: $base->twitterCreator,
-            robots: $base->robots ?? (string) config('posts.seo.default-robots', 'index,follow'),
-            ogSiteName: $base->ogSiteName ?? self::stringConfig('posts.seo.site-name'),
+            robots: $base->robots ?? PostsConfig::defaultRobots(),
+            ogSiteName: $base->ogSiteName ?? PostsConfig::siteName(),
         );
     }
 
@@ -336,7 +337,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     public function slugOptions(): SlugOptions
     {
         return SlugOptions::make(
-            PostSlugs::definition((string) config('posts.slugs.source', 'title'))
+            PostSlugs::definition(PostsConfig::slugSource())
                 ->keepHistory(Config::boolean('posts.slugs.history'))
                 ->lockWhen(fn (Post $post): bool => Config::boolean('posts.slugs.lock-when-published')
                     && $post->status === PostStatus::Published)
@@ -421,15 +422,8 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
             return null;
         }
 
-        $url = $this->featuredImageUrl((string) config('posts.media.og_variant', ''));
+        $url = $this->featuredImageUrl(PostsConfig::ogVariant());
 
         return $url !== '' ? $url : null;
-    }
-
-    private static function stringConfig(string $key): ?string
-    {
-        $value = config($key);
-
-        return is_string($value) && $value !== '' ? $value : null;
     }
 }

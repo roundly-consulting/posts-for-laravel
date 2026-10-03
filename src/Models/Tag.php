@@ -14,6 +14,7 @@ use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasTranslatableAttributes;
 use RoundlyConsulting\Posts\Database\Factories\TagFactory;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 use RoundlyConsulting\Posts\Support\PostSlugs;
 use RoundlyConsulting\Sluggable\Concerns\HasSlug;
 use RoundlyConsulting\Sluggable\Contracts\Sluggable;
@@ -48,7 +49,7 @@ final class Tag extends Model implements Sluggable
 
     public function getTable(): string
     {
-        return (string) config('posts.tables.tags', 'post_tags');
+        return PostsConfig::tagsTable();
     }
 
     /** @return array<string, string> */
@@ -65,7 +66,7 @@ final class Tag extends Model implements Sluggable
     {
         return $this->belongsToMany(
             PostModel::class(),
-            (string) config('posts.tables.tag_post', 'post_tag'),
+            PostsConfig::tagPostTable(),
             'tag_id',
             'post_id',
         )->withTimestamps();

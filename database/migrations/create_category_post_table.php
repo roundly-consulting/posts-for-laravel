@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 
 return new class extends Migration
 {
@@ -15,7 +16,7 @@ return new class extends Migration
         // primary key rather than the outbound author key.
         $primaryKeyType = KeyType::fromConfig('posts.primary_key_type');
 
-        Schema::create((string) config('posts.tables.category_post', 'category_post'), function (Blueprint $table) use ($primaryKeyType): void {
+        Schema::create(PostsConfig::categoryPostTable(), function (Blueprint $table) use ($primaryKeyType): void {
             $table->ownerKey('post_id', $primaryKeyType, nullable: false, index: true);
             $table->ownerKey('category_id', $primaryKeyType, nullable: false, index: true);
             $table->timestamps();

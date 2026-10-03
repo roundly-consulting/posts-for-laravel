@@ -22,7 +22,7 @@ final class JsonLdBuilder
 
         $data = [
             '@context' => 'https://schema.org',
-            '@type' => (string) config('posts.json-ld.type', 'BlogPosting'),
+            '@type' => PostsConfig::jsonLdType(),
             // The same locale fallback as `$post->title` and the meta tags.
             'headline' => $post->getTranslation('title', $locale),
             'description' => $seo->metaDescription ?? '',
@@ -91,7 +91,7 @@ final class JsonLdBuilder
             return null;
         }
 
-        $attribute = (string) config('posts.json-ld.author-attribute', 'name');
+        $attribute = PostsConfig::jsonLdAuthorAttribute();
         $value = $author->getAttribute($attribute);
 
         return is_string($value) && $value !== '' ? $value : null;
@@ -100,9 +100,9 @@ final class JsonLdBuilder
     /** @return array<string, mixed>|null */
     private function publisher(): ?array
     {
-        $name = config('posts.json-ld.publisher.name');
+        $name = PostsConfig::publisherName();
 
-        if (! is_string($name) || $name === '') {
+        if ($name === null) {
             return null;
         }
 
@@ -111,9 +111,9 @@ final class JsonLdBuilder
             'name' => $name,
         ];
 
-        $logo = config('posts.json-ld.publisher.logo');
+        $logo = PostsConfig::publisherLogo();
 
-        if (is_string($logo) && $logo !== '') {
+        if ($logo !== null) {
             $publisher['logo'] = [
                 '@type' => 'ImageObject',
                 'url' => $logo,

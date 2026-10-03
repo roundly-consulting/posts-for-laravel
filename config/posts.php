@@ -68,6 +68,10 @@ return [
     | The database table names used by the package. Override any of them if the
     | defaults collide with tables that already exist in your application.
     |
+    | Every string setting in this file is read strictly: a default applies only
+    | when the key is unset (null). A blank or non-string value throws an
+    | InvalidConfigurationException instead of being cast or replaced.
+    |
     */
 
     'tables' => [
@@ -158,7 +162,7 @@ return [
     'seo' => [
         'site-name' => env('POSTS_SITE_NAME'),
         'twitter-site' => env('POSTS_TWITTER_SITE'),
-        'default-card' => 'summary_large_image',
+        'default-card' => 'summary_large_image', // 'summary' | 'summary_large_image' | 'app' | 'player'
         'default-robots' => 'index,follow',
     ],
 
@@ -168,7 +172,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Controls the schema.org structured data emitted for a post. "type" is the
-    | schema.org @type ("BlogPosting" or "Article"); "author-attribute" is the
+    | schema.org @type ("BlogPosting" or "Article"; anything else throws); "author-attribute" is the
     | attribute read from the author model for the author name.
     |
     */
@@ -209,8 +213,9 @@ return [
         // null => an empty string is returned instead.
         'featured_fallback_url' => env('POSTS_MEDIA_FEATURED_FALLBACK'),
 
-        // Responsive width ladder for featured/gallery/content images.
-        // null => the media-library default ladder (config('media.responsive.widths')).
+        // Responsive width ladder for featured/gallery/content images: positive integers
+        // ([] declares no variants). null => the media-library default ladder
+        // (config('media.responsive.widths')).
         'responsive_widths' => null,
 
         // Fall back the SEO og:image / JSON-LD image to the featured image URL
@@ -231,7 +236,7 @@ return [
         'inline' => [
             'enabled' => true,
             'default_variant' => '',
-            'on_missing' => 'strip', // 'strip' | 'keep'
+            'on_missing' => 'strip', // 'strip' | 'keep' (anything else throws)
         ],
     ],
 
@@ -254,7 +259,7 @@ return [
     'moderation' => [
 
         // Auto-unpublish a post when a report against it is upheld (ReportResolved).
-        // 'archive' | 'draft' | null (disable the resolved path).
+        // 'archive' | 'draft' | null (disable the resolved path). Anything else throws.
         'on_resolved' => 'archive',
 
         // Auto-unpublish (archive) a post when its open-report count crosses the

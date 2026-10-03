@@ -9,6 +9,7 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Support\PostModel;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 use RoundlyConsulting\Reports\Events\ReportResolved;
 use RoundlyConsulting\Reports\Events\ReportThresholdReached;
 
@@ -31,13 +32,14 @@ final class SyncPostVisibilityFromReports
 {
     /**
      * Auto-unpublish a post whose report was upheld, per
-     * `posts.moderation.on_resolved` ('archive' | 'draft' | null to disable).
+     * `posts.moderation.on_resolved` ('archive' | 'draft' | null to disable; anything else
+     * throws).
      */
     public function handleResolved(ReportResolved $event): void
     {
-        $action = config('posts.moderation.on_resolved', 'archive');
+        $action = PostsConfig::onResolved();
 
-        if (! is_string($action)) {
+        if ($action === null) {
             return;
         }
 

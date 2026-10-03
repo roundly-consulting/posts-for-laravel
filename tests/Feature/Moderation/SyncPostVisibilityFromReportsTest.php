@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Event;
 use RoundlyConsulting\Approvals\Enums\ApprovalRule;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Events\PostArchived;
 use RoundlyConsulting\Posts\Events\PostDrafted;
@@ -138,14 +139,15 @@ it('archives the post through a multi-moderator sign-off', function (): void {
     expect($post->fresh()->status)->toBe(PostStatus::Archived);
 });
 
-it('leaves the post published for an unrecognised action', function (): void {
-    config()->set('posts.moderation.on_resolved', 'freeze');
+it('refuses an unrecognised action instead of skipping the unpublish (strict config)', function (): void {
+    config()->set('posts.moderation.on_resolved', 'archvie');
 
     $post = Post::factory()->published()->create();
 
-    reportAndResolve($post);
-
-    expect($post->fresh()->status)->toBe(PostStatus::Published);
+    expect(fn () => reportAndResolve($post))->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [posts.moderation.on_resolved] must be one of [archive, draft], [archvie] given.',
+    );
 });
 
 it('ignores a report whose subject is missing', function (): void {

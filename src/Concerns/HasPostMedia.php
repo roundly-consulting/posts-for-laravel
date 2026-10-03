@@ -12,6 +12,7 @@ use RoundlyConsulting\MediaLibrary\Models\Media;
 use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Support\ContentMediaRenderer;
 use RoundlyConsulting\Posts\Support\MediaUrl;
+use RoundlyConsulting\Posts\Support\PostsConfig;
 
 /**
  * First-class media for the bundled Post model, built on
@@ -45,9 +46,9 @@ trait HasPostMedia
                 ->acceptsMimeTypes(self::IMAGE_MIME_TYPES),
         );
 
-        $fallback = config('posts.media.featured_fallback_url');
+        $fallback = PostsConfig::featuredFallbackUrl();
 
-        if (is_string($fallback) && $fallback !== '') {
+        if ($fallback !== null) {
             $featured->useFallbackUrl($fallback);
         }
 
@@ -144,7 +145,7 @@ trait HasPostMedia
         $rendered = $renderer->render(
             $content,
             $media,
-            (string) config('posts.media.inline.default_variant', ''),
+            PostsConfig::inlineDefaultVariant(),
             $this->onMissingStrategy(),
         );
 
@@ -153,57 +154,34 @@ trait HasPostMedia
 
     public function featuredBucket(): string
     {
-        return (string) config('posts.media.featured_bucket', 'featured');
+        return PostsConfig::featuredBucket();
     }
 
     public function galleryBucket(): string
     {
-        return (string) config('posts.media.gallery_bucket', 'gallery');
+        return PostsConfig::galleryBucket();
     }
 
     public function contentBucket(): string
     {
-        return (string) config('posts.media.content_bucket', 'content');
+        return PostsConfig::contentBucket();
     }
 
     private function configureMediaBucket(MediaBucket $bucket): MediaBucket
     {
-        $disk = config('posts.media.disk');
+        $disk = PostsConfig::mediaDisk();
 
-        if (is_string($disk) && $disk !== '') {
+        if ($disk !== null) {
             $bucket->useDisk($disk);
         }
 
-        $widths = config('posts.media.responsive_widths');
-
-        $bucket->responsiveWidths(
-            is_array($widths) ? $this->normalizeWidths($widths) : null,
-        );
+        $bucket->responsiveWidths(PostsConfig::responsiveWidths());
 
         return $bucket;
     }
 
-    /**
-     * @param  array<array-key, mixed>  $widths
-     * @return list<int>
-     */
-    private function normalizeWidths(array $widths): array
-    {
-        $clean = [];
-
-        foreach ($widths as $width) {
-            if (is_int($width) && $width > 0) {
-                $clean[] = $width;
-            }
-        }
-
-        return $clean;
-    }
-
     private function onMissingStrategy(): string
     {
-        $strategy = config('posts.media.inline.on_missing', 'strip');
-
-        return $strategy === 'keep' ? 'keep' : 'strip';
+        return PostsConfig::inlineOnMissing();
     }
 }
