@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException;
 
 /**
  * Pins the schema the posts migration emits for EVERY supported key type, on BOTH axes.
@@ -71,8 +72,11 @@ it('emits a ulid author key when configured for ulid', function (): void {
         ->toContain('"author_id" varchar,');
 });
 
-it('falls back to bigint for an unrecognized key type instead of throwing', function (): void {
-    expect(probeSchema('bogus'))->toContain('"author_id" integer,');
+it('refuses an unrecognized author key type instead of falling back to bigint', function (): void {
+    expect(fn (): string => probeSchema('bogus'))->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [posts.key_type] must be one of [bigint, uuid, ulid] (case-insensitive), [bogus] given.',
+    );
 });
 
 it('emits a required morph pair when the author is not nullable', function (): void {
@@ -102,9 +106,11 @@ it('emits a ulid post id when configured for ulid', function (): void {
         ->toContain('primary key ("id")');
 });
 
-it('falls back to a bigint post id for an unrecognized key type instead of throwing', function (): void {
-    expect(probeSchema('bigint', primaryKeyType: 'bogus'))
-        ->toContain('"id" integer primary key autoincrement not null');
+it('refuses an unrecognized post id key type instead of falling back to bigint', function (): void {
+    expect(fn (): string => probeSchema('bigint', primaryKeyType: 'bogus'))->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [posts.primary_key_type] must be one of [bigint, uuid, ulid] (case-insensitive), [bogus] given.',
+    );
 });
 
 /**
