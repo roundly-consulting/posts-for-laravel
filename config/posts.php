@@ -111,6 +111,12 @@ return [
     | current locale. "fallback" is the locale a translation falls back to when
     | the current one is missing.
     |
+    | posts keeps its own fallback-locale chain: translatable.fallback_locale,
+    | then this "fallback", then app.fallback_locale — the first one that is
+    | set wins; absent, null or blank (POSTS_FALLBACK_LOCALE=) passes to the
+    | next. Setting this to null does not turn the fallback off; read one
+    | locale with getTranslation($key, $locale, false) for that.
+    |
     */
 
     'locales' => [

@@ -131,7 +131,7 @@ The published `config/posts.php`:
 | `tables.tag_post` | string | `post_tag` | — | Tag/post pivot table. |
 | `author.morph-name` | string | `author` | — | Morph relation name (`author_type`/`author_id`). |
 | `author.nullable` | bool | `true` | — | Whether a post may have no author. |
-| `locales.fallback` | string | `app.fallback_locale` | `POSTS_FALLBACK_LOCALE` | Fallback locale for translations/route binding. |
+| `locales.fallback` | string | `app.fallback_locale` | `POSTS_FALLBACK_LOCALE` | Fallback locale for translations/route binding. Not set (absent, `null`, blank) falls through to `app.fallback_locale` — it does not turn the fallback off ([fallback chain](#authoring-multilingual-posts)). |
 | `slugs.source` | string | `title` | — | Attribute slugs are generated from. |
 | `slugs.separator` | string | `-` | — | Slug word separator. |
 | `slugs.unique` | bool | `true` | — | Suffix colliding slugs per locale (`-2`, `-3`, …), trashed rows included; at migrate time, also builds the per-locale unique indexes. |
@@ -391,11 +391,31 @@ $post->translate('title');                // current-locale value, with fallback
 $post->title;                             // same — current-locale value, with fallback
 ```
 
-Translations resolve to the requested locale, then the fallback locale
-(`translatable.fallback_locale`, else `posts.locales.fallback`, else `app.fallback_locale` — a
-blank one is not set and passes to the next),
-then the lowest-sorting locale that holds a value (a stable choice, independent of the
-order the database returns the JSON keys in).
+Translations resolve to the requested locale, then the fallback locale, then the
+lowest-sorting locale that holds a value (a stable choice, independent of the order the
+database returns the JSON keys in).
+
+**posts keeps its own fallback-locale chain.** The fallback locale is the first of these that
+is set — absent, `null` or blank (`''`, whitespace, a `KEY=` line) is not set and passes to
+the next:
+
+1. `translatable.fallback_locale`
+2. `posts.locales.fallback` (`POSTS_FALLBACK_LOCALE`)
+3. `app.fallback_locale`
+
+translatable-for-laravel itself reads an empty `translatable.fallback_locale` as "no fallback";
+posts differs because it has its own setting, `posts.locales.fallback`, to fall through to.
+
+**Turning the fallback off.** There is no single switch: setting `posts.locales.fallback` to
+`null` (or a blank `POSTS_FALLBACK_LOCALE=`) does **not** turn it off — the read falls through
+to `app.fallback_locale`. The fallback-locale step is skipped only when all three are not set,
+and even then the lowest-sorting locale with a value is still used. To read exactly one locale
+with no fallback at all, pass `false`:
+
+```php
+$post->getTranslation('title', 'sk', useFallbackLocale: false); // '' when there is no `sk` value
+$post->getTranslations('title');                                // the raw locale => value map
+```
 
 ### Publishing lifecycle
 
