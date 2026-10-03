@@ -75,6 +75,31 @@ it('resolves the fallback locale from the posts config when translatable config 
     expect($post->getTranslation('content', 'sk'))->toBe('<p>Body</p>');
 });
 
+it('reads a blank translatable or posts fallback locale as not set (strict config)', function (): void {
+    config()->set('translatable.fallback_locale', '');
+    config()->set('posts.locales.fallback', ' ');
+    config()->set('app.fallback_locale', 'de');
+
+    $post = new Post;
+    $post->setTranslation('title', 'de', 'Hallo');
+    $post->setTranslation('title', 'at', 'Servus');
+
+    // `at` sorts first, so only the app fallback (`de`) explains this pick.
+    expect($post->getTranslation('title', 'fr'))->toBe('Hallo');
+});
+
+it('refuses a non-string translatable fallback locale (strict config)', function (): void {
+    config()->set('translatable.fallback_locale', ['en']);
+
+    $post = new Post;
+    $post->setTranslation('title', 'en', 'Hello');
+
+    expect(fn () => $post->getTranslation('title', 'sk'))->toThrow(
+        RoundlyConsulting\PackageToolkit\Exceptions\InvalidConfigurationException::class,
+        'translatable.fallback_locale',
+    );
+});
+
 it('translates an attribute via the translate helper for an explicit and the current locale', function (): void {
     app()->setLocale('en');
 

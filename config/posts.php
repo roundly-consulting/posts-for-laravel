@@ -68,8 +68,9 @@ return [
     | The database table names used by the package. Override any of them if the
     | defaults collide with tables that already exist in your application.
     |
-    | Every string setting in this file is read strictly: a default applies only
-    | when the key is unset (null). A blank or non-string value throws an
+    | Every string setting in this file is read strictly: a value that is not set
+    | (null, or blank like a host's KEY=) takes the default, or none for an
+    | optional setting. A non-string value throws an
     | InvalidConfigurationException instead of being cast or replaced.
     |
     */

@@ -162,14 +162,16 @@ The published `config/posts.php`:
 | `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a published or scheduled post when it crosses the global `reports.threshold`. |
 
 Every `bool` switch is read strictly: `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no`
-turn it off, and anything else (say `POSTS_SLUG_HISTORY=disabled`) throws
-`InvalidConfigurationException` instead of quietly reading as the default.
+turn it off, a blank value (`POSTS_SLUG_HISTORY=`) is not set so the default applies, and
+anything else (say `POSTS_SLUG_HISTORY=disabled`) throws `InvalidConfigurationException`
+instead of quietly reading as the default.
 
-Every other setting is just as strict. A default applies only when the key is absent (unset or
-`null`). A string setting — a table or bucket name, the morph name, the slug source or
-separator, a locale, an SEO / JSON-LD value, the media disk or fallback URL — must be a
-non-empty string when set: a blank (`POSTS_SITE_NAME=` included) or non-string value throws
-rather than being cast to `''` or replaced by the default. A `seo.default-card`, `json-ld.type`,
+Every other setting is just as strict. A setting that is not set — absent, `null`, or blank like
+a host's `POSTS_SITE_NAME=` — takes its default, and an optional one (the SEO / JSON-LD
+publisher values, the media disk or fallback URL) stays unset. A string setting — a table or
+bucket name, the morph name, the slug source or separator, a locale, an SEO / JSON-LD value,
+the media disk or fallback URL — must be a string when set: a non-string value throws rather
+than being cast to `''` or replaced by the default. A `seo.default-card`, `json-ld.type`,
 `media.inline.on_missing` or `moderation.on_resolved` value outside its list throws (an
 `on_resolved` typo no longer skips the auto-unpublish), and so does a responsive width that is
 not a positive integer. The variant names (`media.og_variant`, `media.inline.default_variant`)
@@ -390,7 +392,8 @@ $post->title;                             // same — current-locale value, with
 ```
 
 Translations resolve to the requested locale, then the fallback locale
-(`translatable.fallback_locale`, else `posts.locales.fallback`, else `app.fallback_locale`),
+(`translatable.fallback_locale`, else `posts.locales.fallback`, else `app.fallback_locale` — a
+blank one is not set and passes to the next),
 then the lowest-sorting locale that holds a value (a stable choice, independent of the
 order the database returns the JSON keys in).
 

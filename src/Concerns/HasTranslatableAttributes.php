@@ -142,18 +142,19 @@ trait HasTranslatableAttributes
 
     private function translatableFallbackLocale(): ?string
     {
-        if (config('translatable.fallback_locale') !== null) {
-            $configured = config('translatable.fallback_locale');
+        // Blank (`''` or whitespace — a host's `KEY=`) is not set, exactly like absent.
+        $configured = PostsConfig::unlessBlank(config('translatable.fallback_locale'));
 
-            if (! is_string($configured) || trim($configured) === '') {
+        if ($configured !== null) {
+            if (! is_string($configured)) {
                 throw InvalidConfigurationException::notAString('translatable.fallback_locale', $configured);
             }
 
             return $configured;
         }
 
-        $configured = PostsConfig::configuredFallbackLocale() ?? config('app.fallback_locale');
+        $configured = PostsConfig::configuredFallbackLocale() ?? PostsConfig::unlessBlank(config('app.fallback_locale'));
 
-        return is_string($configured) && $configured !== '' ? $configured : null;
+        return is_string($configured) ? $configured : null;
     }
 }

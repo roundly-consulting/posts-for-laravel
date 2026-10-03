@@ -10,8 +10,9 @@ use RoundlyConsulting\PackageToolkit\Support\Config;
 /**
  * Strict readers for the package's non-boolean settings.
  *
- * A default applies only when the key is absent (null). Anything present but unusable — a blank
- * or non-string table name, a `BlogPostng` schema type, an `archvie` moderation action, a junk
+ * A setting that is not set — absent, null, or blank like a host's `KEY=` — takes its default
+ * (or, for an optional setting such as the site name, none). Anything else unusable — a
+ * non-string table name, a `BlogPostng` schema type, an `archvie` moderation action, a junk
  * width — throws {@see InvalidConfigurationException} naming the key, instead of being cast to
  * `''` / `Array`, passed through, or replaced by a default.
  *
@@ -62,13 +63,13 @@ final class PostsConfig
     /** The slug fallback locale; the app's fallback locale (else `en`) when unset. */
     public static function fallbackLocale(): string
     {
-        if (config('posts.locales.fallback') !== null) {
+        if (self::unlessBlank(config('posts.locales.fallback')) !== null) {
             return self::string('posts.locales.fallback', 'en');
         }
 
-        $app = config('app.fallback_locale');
+        $app = self::unlessBlank(config('app.fallback_locale'));
 
-        return is_string($app) && $app !== '' ? $app : 'en';
+        return is_string($app) ? $app : 'en';
     }
 
     /** `posts.locales.fallback`, or null when unset (the caller then consults the app). */
@@ -158,7 +159,7 @@ final class PostsConfig
     public static function responsiveWidths(): ?array
     {
         $key = 'posts.media.responsive_widths';
-        $widths = config($key);
+        $widths = self::unlessBlank(config($key));
 
         if ($widths === null) {
             return null;
@@ -201,7 +202,7 @@ final class PostsConfig
     /** `archive` or `draft`, or null when the resolved-report path is disabled. */
     public static function onResolved(): ?string
     {
-        return config('posts.moderation.on_resolved') === null
+        return self::unlessBlank(config('posts.moderation.on_resolved')) === null
             ? null
             : Config::oneOf('posts.moderation.on_resolved', ['archive', 'draft'], 'archive');
     }
@@ -213,23 +214,32 @@ final class PostsConfig
 
     private static function optionalString(string $key): ?string
     {
-        $value = config($key);
+        $value = self::unlessBlank(config($key));
 
         if ($value === null) {
             return null;
         }
 
-        if (! is_string($value) || trim($value) === '') {
+        if (! is_string($value)) {
             throw InvalidConfigurationException::notAString($key, $value);
         }
 
         return $value;
     }
 
-    /** A variant name: any string, `''` meaning the original; absent reads as `''`. */
+    /**
+     * A raw config value, with a blank string (`''` or whitespace — a host's `KEY=`) read as
+     * null: not set, exactly like an absent key.
+     */
+    public static function unlessBlank(mixed $value): mixed
+    {
+        return is_string($value) && trim($value) === '' ? null : $value;
+    }
+
+    /** A variant name: any string, `''` meaning the original; not set (absent or blank) reads as `''`. */
     private static function variant(string $key): string
     {
-        $value = config($key) ?? '';
+        $value = self::unlessBlank(config($key)) ?? '';
 
         if (! is_string($value)) {
             throw new InvalidConfigurationException(
