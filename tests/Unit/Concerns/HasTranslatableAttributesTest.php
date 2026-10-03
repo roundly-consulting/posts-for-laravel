@@ -88,6 +88,50 @@ it('reads a blank translatable or posts fallback locale as not set (strict confi
     expect($post->getTranslation('title', 'fr'))->toBe('Hallo');
 });
 
+/**
+ * posts keeps its own fallback-locale chain. A `translatable.fallback_locale` that is not set
+ * (absent, null or blank) falls through to `posts.locales.fallback`, then `app.fallback_locale`;
+ * only when all three are not set does the read skip the fallback locale and take the
+ * lowest-sorting locale that holds a value. (translatable-for-laravel reads its own blank key as
+ * "no fallback"; posts differs because it has its own setting to fall through to.)
+ */
+it('falls through translatable, then posts, then the app fallback locale', function (?string $translatable, ?string $posts, ?string $app, string $expected): void {
+    config()->set('translatable.fallback_locale', $translatable);
+    config()->set('posts.locales.fallback', $posts);
+    config()->set('app.fallback_locale', $app);
+
+    $post = new Post;
+
+    // Each value names its locale; `aa` sorts first, so any other pick is the chain's doing.
+    foreach (['aa', 'cs', 'de', 'sk'] as $locale) {
+        $post->setTranslation('title', $locale, $locale);
+    }
+
+    expect($post->getTranslation('title', 'fr'))->toBe($expected)
+        ->and($post->getTranslation('title', 'fr', false))->toBe('');
+})->with([
+    'translatable set: it wins' => ['cs', 'de', 'sk', 'cs'],
+    'translatable null: posts' => [null, 'de', 'sk', 'de'],
+    'translatable blank: posts' => ['', 'de', 'sk', 'de'],
+    'translatable whitespace: posts' => ['  ', 'de', 'sk', 'de'],
+    'translatable and posts null: app' => [null, null, 'sk', 'sk'],
+    'translatable and posts blank: app' => ['', ' ', 'sk', 'sk'],
+    'all three not set: lowest-sorting locale' => [null, '', ' ', 'aa'],
+]);
+
+it('falls through an absent translatable config to the posts fallback locale', function (): void {
+    config()->set('translatable', []);
+    config()->set('posts.locales.fallback', 'de');
+    config()->set('app.fallback_locale', 'sk');
+
+    $post = new Post;
+    $post->setTranslation('title', 'aa', 'aa');
+    $post->setTranslation('title', 'de', 'de');
+    $post->setTranslation('title', 'sk', 'sk');
+
+    expect($post->getTranslation('title', 'fr'))->toBe('de');
+});
+
 it('refuses a non-string translatable fallback locale (strict config)', function (): void {
     config()->set('translatable.fallback_locale', ['en']);
 
