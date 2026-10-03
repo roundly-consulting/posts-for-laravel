@@ -172,6 +172,20 @@ it('reads absent optional strings as unset (strict config)', function (): void {
         ->and($post->toJsonLd())->not->toHaveKey('publisher');
 });
 
+it('reports blank table names as the defaults in about, and a junk one as invalid (strict config)', function (): void {
+    config()->set('posts.tables.posts', '');
+    config()->set('posts.tables.tags', ' ');
+
+    Artisan::call('about', ['--only' => 'posts']);
+
+    expect(Artisan::output())->toMatch('/Tables\W+5 table\(s\), DEFAULT/');
+
+    config()->set('posts.tables.tags', ['post_tags']);
+    Artisan::call('about', ['--only' => 'posts']);
+
+    expect(Artisan::output())->toMatch('/Tables\W+INVALID/');
+});
+
 it('flags a broken setting in about instead of rendering a fallback (strict config)', function (): void {
     config()->set('posts.json-ld.type', 'BlogPostng');
     config()->set('posts.media.inline.on_missing', 'kepe');

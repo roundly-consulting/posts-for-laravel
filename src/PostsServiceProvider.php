@@ -111,21 +111,22 @@ final class PostsServiceProvider extends PackageServiceProvider
         $tables = config('posts.tables');
         $count = is_array($tables) ? count($tables) : 0;
 
-        return $count.' table(s), '.($this->tablesAreDefault() ? 'DEFAULT' : 'CUSTOMISED');
+        return $this->orInvalid(fn (): string => $count.' table(s), '.($this->tablesAreDefault() ? 'DEFAULT' : 'CUSTOMISED'));
     }
 
     /**
-     * Every read is a literal key — a dynamically-built `config('posts.tables.'.$k)`
-     * is invisible to the config-contract scrape, which is what keeps a shipped-but-
-     * unread key from hiding.
+     * Read through the same strict readers the models use (each a literal key — a
+     * dynamically-built `config('posts.tables.'.$k)` is invisible to the config-contract
+     * scrape), so a name that is not set — absent, null or blank — reports as the default
+     * the models actually use, and a junk one as `INVALID`.
      */
     private function tablesAreDefault(): bool
     {
-        return config('posts.tables.posts') === 'posts'
-            && config('posts.tables.categories') === 'post_categories'
-            && config('posts.tables.category_post') === 'category_post'
-            && config('posts.tables.tags') === 'post_tags'
-            && config('posts.tables.tag_post') === 'post_tag';
+        return PostsConfig::postsTable() === 'posts'
+            && PostsConfig::categoriesTable() === 'post_categories'
+            && PostsConfig::categoryPostTable() === 'category_post'
+            && PostsConfig::tagsTable() === 'post_tags'
+            && PostsConfig::tagPostTable() === 'post_tag';
     }
 
     private function moderation(): string
