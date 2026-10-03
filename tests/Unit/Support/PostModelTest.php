@@ -20,10 +20,14 @@ it('resolves a configured host subclass', function (): void {
     expect(PostModel::class())->toBe(CustomPost::class);
 });
 
-it('falls back to the packaged model for an eloquent model that is not a post', function (): void {
+it('refuses a foreign model instead of falling back to the packaged one', function (): void {
+    // The toolkit refuses any class that is not the packaged model or a subclass of it.
     config()->set('posts.model', NotAPost::class);
 
-    expect(PostModel::class())->toBe(Post::class);
+    expect(fn (): string => PostModel::class())->toThrow(
+        InvalidConfigurationException::class,
+        'Configuration value [posts.model] must be a class-string of ['.Post::class.'], ['.NotAPost::class.'] given.',
+    );
 });
 
 it('throws on a configured class that is not a model at all', function (): void {
