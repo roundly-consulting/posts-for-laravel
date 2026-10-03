@@ -6,6 +6,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Support\PostSlugs;
 
 return new class extends Migration
@@ -19,7 +20,7 @@ return new class extends Migration
         $keyType = KeyType::fromConfig('posts.key_type');
         $primaryKeyType = KeyType::fromConfig('posts.primary_key_type');
         $morphName = (string) config('posts.author.morph-name', 'author');
-        $authorNullable = (bool) config('posts.author.nullable', true);
+        $authorNullable = Config::boolean('posts.author.nullable', true);
 
         Schema::create((string) config('posts.tables.posts', 'posts'), function (Blueprint $table) use ($keyType, $primaryKeyType, $morphName, $authorNullable): void {
             match ($primaryKeyType) {

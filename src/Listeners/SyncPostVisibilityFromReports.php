@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace RoundlyConsulting\Posts\Listeners;
 
 use Illuminate\Database\Eloquent\Model;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Enums\PostStatus;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Support\PostModel;
@@ -49,7 +50,7 @@ final class SyncPostVisibilityFromReports
      */
     public function handleThresholdReached(ReportThresholdReached $event): void
     {
-        if (! (bool) config('posts.moderation.auto_unpublish', true)) {
+        if (! Config::boolean('posts.moderation.auto_unpublish', true)) {
             return;
         }
 

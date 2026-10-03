@@ -10,6 +10,7 @@ use RoundlyConsulting\PackageToolkit\Concerns\RegistersBlueprintMacros;
 use RoundlyConsulting\PackageToolkit\Enums\KeyType;
 use RoundlyConsulting\PackageToolkit\Package;
 use RoundlyConsulting\PackageToolkit\PackageServiceProvider;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Commands\PublishScheduledPostsCommand;
 use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Listeners\SyncPostVisibilityFromReports;
@@ -55,7 +56,7 @@ final class PostsServiceProvider extends PackageServiceProvider
         // requiring reports. Registration is idempotent, guarded by `hasMacro()`.
         $this->registerBlueprintMacros();
 
-        if ((bool) config('posts.slugs.route-binding', true)) {
+        if (Config::boolean('posts.slugs.route-binding', true)) {
             Route::model('post', PostModel::class());
         }
 
@@ -83,14 +84,14 @@ final class PostsServiceProvider extends PackageServiceProvider
             // posts.id hide behind a bigint author key that was correct all along.
             'Key type (author)' => KeyType::fromConfig('posts.key_type')->value,
             'Key type (posts id)' => KeyType::fromConfig('posts.primary_key_type')->value,
-            'Author' => (bool) config('posts.author.nullable', true) ? 'OPTIONAL' : 'REQUIRED',
+            'Author' => Config::boolean('posts.author.nullable', true) ? 'OPTIONAL' : 'REQUIRED',
             'Tables' => $this->tables(),
             'Route binding' => $this->switch('posts.slugs.route-binding'),
             'Unique slugs' => $this->switch('posts.slugs.unique'),
-            'Slug history' => (bool) config('posts.slugs.history', false) ? 'ON' : 'OFF',
-            'Slug lock' => (bool) config('posts.slugs.lock-when-published', false) ? 'WHEN PUBLISHED' : 'OFF',
+            'Slug history' => Config::boolean('posts.slugs.history') ? 'ON' : 'OFF',
+            'Slug lock' => Config::boolean('posts.slugs.lock-when-published') ? 'WHEN PUBLISHED' : 'OFF',
             'Media disk' => $this->presence('posts.media.disk', 'MEDIA DEFAULT'),
-            'Inline media' => (bool) config('posts.media.inline.enabled', true)
+            'Inline media' => Config::boolean('posts.media.inline.enabled', true)
                 ? 'ON (missing: '.$this->onMissing().')'
                 : 'OFF',
             'Warm on publish' => $this->switch('posts.media.warm_on_publish'),
@@ -141,7 +142,7 @@ final class PostsServiceProvider extends PackageServiceProvider
 
     private function switch(string $key): string
     {
-        return (bool) config($key, true) ? 'ON' : 'OFF';
+        return Config::boolean($key, true) ? 'ON' : 'OFF';
     }
 
     private function presence(string $key, string $absent): string

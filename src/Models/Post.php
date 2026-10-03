@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\HtmlString;
 use RoundlyConsulting\Likes\Contracts\Likeable;
 use RoundlyConsulting\MediaLibrary\Contracts\HasMedia;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Concerns\HasConfigurableKey;
 use RoundlyConsulting\Posts\Concerns\HasPostMedia;
 use RoundlyConsulting\Posts\Concerns\HasPostReactions;
@@ -336,10 +337,10 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     {
         return SlugOptions::make(
             PostSlugs::definition((string) config('posts.slugs.source', 'title'))
-                ->keepHistory((bool) config('posts.slugs.history', false))
-                ->lockWhen(fn (Post $post): bool => (bool) config('posts.slugs.lock-when-published', false)
+                ->keepHistory(Config::boolean('posts.slugs.history'))
+                ->lockWhen(fn (Post $post): bool => Config::boolean('posts.slugs.lock-when-published')
                     && $post->status === PostStatus::Published)
-                ->routeKey((bool) config('posts.slugs.route-binding', true)),
+                ->routeKey(Config::boolean('posts.slugs.route-binding', true)),
         );
     }
 
@@ -416,7 +417,7 @@ class Post extends Model implements HasMedia, Likeable, Reportable, Sluggable
     /** The featured image URL used as the og:image fallback, or null when unavailable/disabled. */
     private function fallbackOgImage(): ?string
     {
-        if (! (bool) config('posts.media.seo_og_image', true)) {
+        if (! Config::boolean('posts.media.seo_og_image', true)) {
             return null;
         }
 

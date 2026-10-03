@@ -7,6 +7,7 @@ namespace RoundlyConsulting\Posts\Listeners;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use RoundlyConsulting\MediaLibrary\Jobs\GenerateVariantsJob;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Events\PostPublished;
 use RoundlyConsulting\Posts\Models\Post;
 use RoundlyConsulting\Posts\Support\PostModel;
@@ -20,7 +21,7 @@ final class WarmPostMediaVariants implements ShouldQueue
 {
     public function handle(PostPublished $event): void
     {
-        if (! (bool) config('posts.media.warm_on_publish', true)) {
+        if (! Config::boolean('posts.media.warm_on_publish', true)) {
             return;
         }
 

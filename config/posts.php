@@ -26,8 +26,8 @@ return [
     | The primary-key strategy of the models a post is authored by. It sets the
     | column type of the author morph key and must match your author model's
     | primary key: "bigint" (the Laravel default), "uuid" or "ulid". Anything
-    | unrecognized falls back to "bigint". It is fixed when the migration first
-    | runs, so choose it before publishing the migrations.
+    | else throws an InvalidConfigurationException. It is fixed when the
+    | migration first runs, so choose it before publishing the migrations.
     |
     | This is your AUTHOR model's key type, not the post's own — see
     | "primary_key_type" below. The two are independent: a host with bigint users
@@ -44,8 +44,8 @@ return [
     |
     | The primary-key strategy of the package's own tables — posts, categories and
     | tags, plus the pivots and the category parent link that reference them:
-    | "bigint" (the Laravel default), "uuid" or "ulid". Anything unrecognized
-    | falls back to "bigint".
+    | "bigint" (the Laravel default), "uuid" or "ulid". Anything else throws an
+    | InvalidConfigurationException.
     |
     | This is the key OTHER packages' polymorphic columns point at. A morph column
     | (`likeable_id`, `reportable_id`, ...) defaults to an unsigned bigint, so on a

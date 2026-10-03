@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace RoundlyConsulting\Posts\Support;
 
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Sluggable\DataTransferObjects\SlugIndexSpec;
 use RoundlyConsulting\Sluggable\Definitions\SlugDefinition;
 use RoundlyConsulting\Sluggable\Enums\EmptySourcePolicy;
@@ -41,7 +42,7 @@ final class PostSlugs
             ->perLocaleUniqueness()
             ->includeTrashed();
 
-        return (bool) config('posts.slugs.unique', true) ? $definition->unique() : $definition->notUnique();
+        return Config::boolean('posts.slugs.unique', true) ? $definition->unique() : $definition->notUnique();
     }
 
     /**
@@ -53,7 +54,7 @@ final class PostSlugs
      */
     public static function ensureIndexes(string $table): void
     {
-        if (! (bool) config('posts.slugs.unique', true)) {
+        if (! Config::boolean('posts.slugs.unique', true)) {
             return;
         }
 

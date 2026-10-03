@@ -9,6 +9,7 @@ use Illuminate\Support\HtmlString;
 use RoundlyConsulting\MediaLibrary\Buckets\MediaBucket;
 use RoundlyConsulting\MediaLibrary\Concerns\InteractsWithMedia;
 use RoundlyConsulting\MediaLibrary\Models\Media;
+use RoundlyConsulting\PackageToolkit\Support\Config;
 use RoundlyConsulting\Posts\Support\ContentMediaRenderer;
 use RoundlyConsulting\Posts\Support\MediaUrl;
 
@@ -122,7 +123,7 @@ trait HasPostMedia
         $locale ??= app()->getLocale();
         $content = $this->getTranslation('content', $locale);
 
-        if (! (bool) config('posts.media.inline.enabled', true)) {
+        if (! Config::boolean('posts.media.inline.enabled', true)) {
             return new HtmlString($content);
         }
 

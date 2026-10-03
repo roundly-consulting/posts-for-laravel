@@ -109,8 +109,8 @@ php artisan vendor:publish --tag="posts-views"
 
 > **Key types are fixed at first migrate.** Both `posts.key_type` (your author model's key) and
 > `posts.primary_key_type` (the posts tables' own ids) are read when the migration runs. Choose
-> them **before** running `migrate`; an unrecognized value falls back to `bigint`, and changing
-> either later is a data migration. See [Key types](#key-types).
+> them **before** running `migrate`; an unrecognized value throws `InvalidConfigurationException`
+> rather than migrating as `bigint`, and changing either later is a data migration. See [Key types](#key-types).
 
 > **PostgreSQL:** translatable columns ship as `jsonb`; the slug indexes are expression indexes
 > on `slug->>'<locale>'`, so slug lookups and route binding use them.
@@ -122,8 +122,8 @@ The published `config/posts.php`:
 | Key | Type | Default | Env | Purpose |
 |---|---|---|---|---|
 | `model` | class-string | `Post::class` | — | The Post model (point at your subclass to extend). |
-| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_KEY_TYPE` | **Outbound**: your *author* model's key type, which sets the `author_id` morph column. Anything else falls back to `bigint`. |
-| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_PRIMARY_KEY_TYPE` | **Inbound**: the key type of posts' *own* tables (posts, tags, categories and their pivots). Anything else falls back to `bigint`. See [Key types](#key-types). |
+| `key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_KEY_TYPE` | **Outbound**: your *author* model's key type, which sets the `author_id` morph column. Anything else throws `InvalidConfigurationException`. |
+| `primary_key_type` | `bigint`\|`uuid`\|`ulid` | `bigint` | `POSTS_PRIMARY_KEY_TYPE` | **Inbound**: the key type of posts' *own* tables (posts, tags, categories and their pivots). Anything else throws `InvalidConfigurationException`. See [Key types](#key-types). |
 | `tables.posts` | string | `posts` | — | Posts table name. |
 | `tables.categories` | string | `post_categories` | — | Categories table name. |
 | `tables.category_post` | string | `category_post` | — | Category/post pivot table. |
@@ -160,6 +160,10 @@ The published `config/posts.php`:
 | `media.inline.on_missing` | `strip`\|`keep` | `strip` | — | Drop or keep tokens whose media is missing/unauthorized. |
 | `moderation.on_resolved` | `archive`\|`draft`\|`null` | `archive` | — | Auto-unpublish action when a report against a published or scheduled post is upheld (`null` = disable). |
 | `moderation.auto_unpublish` | bool | `true` | — | Auto-archive a published or scheduled post when it crosses the global `reports.threshold`. |
+
+Every `bool` switch is read strictly: `true`/`1`/`on`/`yes` turn it on, `false`/`0`/`off`/`no`
+turn it off, and anything else (say `POSTS_SLUG_HISTORY=disabled`) throws
+`InvalidConfigurationException` instead of quietly reading as the default.
 
 ### Key types
 
