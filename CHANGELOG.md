@@ -6,6 +6,10 @@ All notable changes to `posts-for-laravel` are documented in this file. The form
 
 ## Unreleased
 
+### Changed
+
+- Maintenance: requires the latest roundly packages — package-toolkit `^1.3.0`, enums `^1.1.0`, approvals `^1.2.3`, likes `^1.1.0`, media-library `^1.1.2`, reports `^1.1.0`, sluggable `^1.1.1`; dev: testing `^1.2.1`.
+
 ## 1.0.0 - 2026-10-03
 
 Initial public release.
