@@ -62,6 +62,9 @@ ArchPresets::noLocalCryptoPrimitives('RoundlyConsulting\Posts');
  */
 ArchPresets::modelsResolveThroughSeam(__DIR__.'/../src', 'Support', ['posts.model']);
 
+// A host swap reaches `Post::factory()` too: the factory builds the configured model.
+ArchPresets::factoriesResolveThroughSeam(__DIR__.'/../database/factories', __DIR__.'/../src', 'Support');
+
 /**
  * The morph-key seam, guarded. Posts' author column migrated off raw `$table->morphs()` onto
  * `morphKey($name, KeyType::fromConfig('posts.key_type'))` so a uuid/ulid host keys the author
