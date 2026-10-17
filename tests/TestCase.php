@@ -69,6 +69,16 @@ abstract class TestCase extends PackageTestCase
     }
 
     /**
+     * Migrate once per worker and reset only the data between tests. Every source's
+     * migrations read config alone (key types, table names, slug locales), which the schema
+     * signature already covers — so the uuid/ulid test cases get schemas of their own.
+     */
+    protected function keepsMigratedSchema(): bool
+    {
+        return true;
+    }
+
+    /**
      * The two independent key axes, plus the media wiring — all applied BEFORE the providers
      * boot and before the migrations run, which is the only window that matters: the
      * migrations read the key types to pick column types, and the models read them to decide
