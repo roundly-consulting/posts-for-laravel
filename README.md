@@ -26,7 +26,7 @@ images, likes and reports come built in through our own media, likes and reports
 
 ## Installation
 
-Requires PHP 8.4 and Laravel 12 or 13.
+Requires PHP 8.4 and Laravel 13.
 
 ```bash
 composer require roundly-consulting/posts-for-laravel
