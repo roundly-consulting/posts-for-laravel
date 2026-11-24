@@ -6,6 +6,12 @@ All notable changes to `posts-for-laravel` are documented in this file. The form
 
 ## Unreleased
 
+## 2.0.1 - 2026-11-24
+
+### Fixed
+
+- PHP 8.6: category tree walks (`ancestors()`, `descendants()`) no longer call the deprecated `spl_object_hash()` for unsaved categories; they use `spl_object_id()`.
+
 ## 2.0.0 - 2026-11-07
 
 ### Changed
