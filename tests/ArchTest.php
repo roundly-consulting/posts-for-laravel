@@ -89,3 +89,8 @@ ArchPresets::noDebuggingLeftovers();
  * through PostsManager — never straight to an action — so `Posts::fake()` sees every call.
  */
 ArchPresets::modelsGoThroughTheFacade('RoundlyConsulting\Posts');
+
+/** `spl_object_hash()` is deprecated in PHP 8.6; `spl_object_id()` is the replacement. */
+arch('avoids functions deprecated in php 8.6')
+    ->expect('RoundlyConsulting\Posts')
+    ->not->toUse(['spl_object_hash']);

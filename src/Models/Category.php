@@ -195,7 +195,7 @@ final class Category extends Model implements Sluggable
     {
         $key = $category->getKey();
 
-        return is_int($key) || is_string($key) ? (string) $key : spl_object_hash($category);
+        return is_int($key) || is_string($key) ? (string) $key : 'object#'.spl_object_id($category);
     }
 
     protected static function newFactory(): CategoryFactory

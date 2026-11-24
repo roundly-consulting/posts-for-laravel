@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Collection;
 use RoundlyConsulting\Posts\Exceptions\InvalidCategoryParentException;
 use RoundlyConsulting\Posts\Models\Category;
 use RoundlyConsulting\Posts\Models\Post;
@@ -111,4 +112,14 @@ it('terminates ancestors and descendants on a cycle written past the model', fun
         ->and($a?->descendants()->pluck('id')->all())->toBe([$b->getKey(), $c->getKey()])
         ->and($self?->ancestors()->all())->toBe([])
         ->and($self?->descendants()->all())->toBe([]);
+});
+
+it('terminates ancestors and descendants on an unsaved in-memory cycle', function (): void {
+    $a = Category::factory()->make();
+    $b = Category::factory()->make();
+    $a->setRelation('parent', $b)->setRelation('children', new Collection([$b]));
+    $b->setRelation('parent', $a)->setRelation('children', new Collection([$a]));
+
+    expect($a->ancestors()->all())->toBe([$b])
+        ->and($a->descendants()->all())->toBe([$b]);
 });
